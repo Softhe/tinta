@@ -701,6 +701,24 @@ if(BUILD_TESTING)
     target_link_libraries(config_path_tests PRIVATE shell32)
     target_compile_definitions(config_path_tests PRIVATE UNICODE _UNICODE)
     add_test(NAME config_paths COMMAND config_path_tests)
+
+    # The system clipboard is one per session: these tests copy, paste and
+    # check what it holds, so under ctest -j one would read another's text.
+    # Each has its own folder; only the clipboard needs taking in turn.
+    set_tests_properties(
+        code_block_layout
+        editor_context_selection
+        editor_features
+        live_editor
+        notification_setting
+        search_input_focus
+        sheet_canvas
+        table_and_modifier_input
+        PROPERTIES RESOURCE_LOCK clipboard)
+    # These two open the real modal Save dialog (tests/save_picker.h). It
+    # takes the foreground as it activates and gives up after 5 seconds, so
+    # two at once would be cancelled out from under each other.
+    set_property(TEST deleted_tab sheet_canvas APPEND PROPERTY RESOURCE_LOCK foreground)
 endif()
 
 # Install
