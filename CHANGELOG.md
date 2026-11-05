@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Middle-click autoscroll, as in other Windows applications. The middle button pressed on the page, the editor's text, the preview beside it, a side panel's list or Help sets a round mark there, and moving the pointer above or below it scrolls up or down, faster the farther it goes; a page wider than the window scrolls across too. Released where it was pressed, it carries on until the next click, key or wheel turn, and Esc stops it without doing anything else; dragged off the mark with the button held, it stops where the button is let go. The tab strip's middle-click still closes a tab, and a sheet still pans with the middle button held
+
 ## [v4.0.2] - 2026-11-03
 
 ### Added

@@ -22,7 +22,7 @@ at once, and many then claimed a copy that had not happened:
 ## Change
 
 - `openClipboard` (`utils.h`) opens the clipboard trying again for up to
-  about 50 ms (10 tries, 5 ms apart). Every clipboard read and write goes
+  about 200 ms (20 tries, 10 ms apart). Every clipboard read and write goes
   through it: the copies above, the rich copy (#285), the diagram image
   copies, and the pastes of the editor, the Find field, table cells and
   annotation notes. The editor's and the table cell editor's own retry
@@ -40,7 +40,7 @@ at once, and many then claimed a copy that had not happened:
 `editor_context_selection` (`tests/editor_context_tests.cpp`), with another
 thread holding the clipboard (`ClipboardHolder`):
 
-- held for a second: menu Cut, Ctrl+X and Ctrl+C in the editor say the
+- held for two seconds: menu Cut, Ctrl+X and Ctrl+C in the editor say the
   clipboard is busy; in the viewer, Ctrl+C keeps the selection and says so,
   Ctrl+C with nothing selected claims no copy, and the code block's Copy,
   the table's Copy and Copy file path say the clipboard is busy without

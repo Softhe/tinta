@@ -28,6 +28,7 @@
 #include "render.h"
 #include "file_utils.h"
 #include "overlays.h"
+#include "autoscroll.h"
 #include "sidepanels.h"
 #include "annotations.h"
 #include "drafts.h"
@@ -1127,6 +1128,9 @@ static void renderChromeAndEnd(App& app) {
     if (app.confirmExitPending) renderConfirmExitDialog(app);
     if (app.createRefPending) renderCreateRefDialog(app);
 
+    // The autoscroll mark, over everything it scrolls
+    renderAutoScrollMark(app);
+
     app.renderTarget->EndDraw();
 }
 
@@ -1297,6 +1301,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_KILLFOCUS:
             if (app) touchCancel(*app, hwnd);
+            if (app) autoScrollEnd(*app, hwnd);
             if (app) tabHoverCardDismiss(*app, hwnd);
             if (app) searchInputMouseUp(*app);
             if (app) cancelDocumentScrollbarDrag(*app, hwnd);
@@ -1372,6 +1377,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_MBUTTONDOWN:
             if (app) tabHoverCardDismiss(*app, hwnd);
+            // A middle click while autoscrolling only stops it
+            if (app && autoScrollTakesPress(*app, hwnd, WM_MBUTTONUP)) return 0;
             if (app && app->renderTarget) {
                 int mx = GET_X_LPARAM(lParam);
                 int my = GET_Y_LPARAM(lParam);
@@ -1381,10 +1388,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 // A sheet pans with the middle button held
                 if (sheetMiddleDown(*app, hwnd, mx, my)) return 0;
+                // Elsewhere it starts autoscroll on what it is pressed on
+                touchStopFling(*app, hwnd);
+                // (not while another button drives a drag)
+                if (!(wParam & (MK_LBUTTON | MK_RBUTTON)) && autoScrollBegin(*app, hwnd, POINT{mx, my}, touchClockMs()))
+                    return 0;
             }
             break;
 
         case WM_MBUTTONUP:
+            if (app && autoScrollTakesRelease(*app, WM_MBUTTONUP)) return 0;
+            if (app && autoScrollActive(*app)) {
+                autoScrollMiddleUp(*app, hwnd, POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}, touchClockMs());
+                return 0;
+            }
             if (app && sheetMiddleUp(*app, hwnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam))) return 0;
             break;
 
@@ -1512,20 +1529,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_MOUSEWHEEL:
+            // The wheel stops autoscroll, and only that
+            if (app && autoScrollActive(*app)) {
+                autoScrollEnd(*app, hwnd);
+                return 0;
+            }
             if (app) touchStopFling(*app, hwnd);
             if (app) handleMouseWheel(*app, hwnd, wParam, lParam);
             return 0;
 
         case WM_MOUSEHWHEEL:
+            if (app && autoScrollActive(*app)) {
+                autoScrollEnd(*app, hwnd);
+                return 0;
+            }
             if (app) touchStopFling(*app, hwnd);
             if (app) handleMouseHWheel(*app, hwnd, wParam, lParam);
             return 0;
 
         case WM_MOUSEMOVE:
+            // Autoscroll steers by the pointer: no hover under it meanwhile
+            if (app && autoScrollActive(*app)) {
+                autoScrollPointer(*app, hwnd, POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+                return 0;
+            }
             if (app) handleMouseMove(*app, hwnd, lParam);
             return 0;
 
         case WM_LBUTTONDOWN:
+            // A click while autoscrolling stops it and does nothing else
+            if (app && autoScrollTakesPress(*app, hwnd, WM_LBUTTONUP)) return 0;
             if (app) touchStopFling(*app, hwnd);
             if (app) handleMouseDown(*app, hwnd, wParam, lParam);
             return 0;
@@ -1540,6 +1573,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_LBUTTONUP:
+            if (app && autoScrollTakesRelease(*app, WM_LBUTTONUP)) return 0;
             if (app) handleMouseUp(*app, hwnd, wParam, lParam);
             return 0;
 
@@ -1568,6 +1602,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_CAPTURECHANGED:
+            if (app && (HWND)lParam != hwnd) autoScrollEnd(*app, hwnd);
             if (app && (HWND)lParam != hwnd) cancelAppMenuPress(*app, hwnd);
             if (app && (HWND)lParam != hwnd) tableEditMouseUp(*app);
             if (app && (HWND)lParam != hwnd) searchInputMouseUp(*app);
@@ -1590,6 +1625,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_CANCELMODE:
             if (app) touchCancel(*app, hwnd);
+            if (app) autoScrollEnd(*app, hwnd);
             if (app) cancelAppMenuPress(*app, hwnd);
             if (app) tableEditMouseUp(*app);
             if (app) searchInputMouseUp(*app);
@@ -1637,7 +1673,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (app && wParam == VK_APPS && editorLiveOn(*app)) return 0;
             break;
 
+        case WM_RBUTTONDOWN:
+            // So does a right click: its release opens no menu
+            if (app && autoScrollTakesPress(*app, hwnd, WM_RBUTTONUP)) return 0;
+            break;
+
+        case WM_RBUTTONUP:
+            if (app && autoScrollTakesRelease(*app, WM_RBUTTONUP)) return 0;
+            break;
+
+        case WM_XBUTTONDOWN:
+            if (app && autoScrollTakesPress(*app, hwnd, WM_XBUTTONUP)) return TRUE;
+            break;
+
         case WM_XBUTTONUP:
+            if (app && autoScrollTakesRelease(*app, WM_XBUTTONUP)) return TRUE;
             // Mouse side buttons walk back/forward across link jumps
             if (app) {
                 if (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) {
@@ -1650,6 +1700,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_SYSKEYDOWN:
             if (app) tabHoverCardDismiss(*app, hwnd);
+            // Alt with a key stops autoscroll too, then goes on to act
+            if (app) autoScrollKey(*app, hwnd, wParam);
             // A fresh Alt press (not its autorepeat) starts a new gesture
             if (app && wParam == VK_MENU && !(lParam & (1 << 30))) {
                 app->altClickGuard = false;
@@ -1737,6 +1789,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (wParam == TIMER_TOUCH_HOLD && app) touchHold(*app, hwnd);
             if (wParam == TIMER_TOUCH_FLING && app) touchFlingStep(*app, hwnd, touchClockMs());
+            if (wParam == TIMER_AUTOSCROLL && app) {
+                // With no button down, moves stop coming once the pointer
+                // leaves the window: each step reads where it is
+                POINT cursor;
+                if (autoScrollActive(*app) && GetCursorPos(&cursor) && ScreenToClient(hwnd, &cursor))
+                    autoScrollPointer(*app, hwnd, cursor);
+                autoScrollStep(*app, hwnd, touchClockMs());
+            }
             if (wParam == TIMER_EDITOR_DRAG_SCROLL && app) editorTextDragScroll(*app, hwnd);
             if (wParam == TIMER_IMAGE_REFLOW && app) {
                 // One relayout for however many images arrived since armed

@@ -19,7 +19,7 @@ previous copy on the clipboard.
 
 ## Change
 
-- The editor's copy retries for up to about 50 ms (10 tries, 5 ms apart),
+- The editor's copy retries for up to about 200 ms (20 tries, 10 ms apart),
   as the table cell editor and the Find field already do, and reports
   whether the text reached the clipboard. It uses the shared
   `copyToClipboard` instead of its own copy of it.
@@ -36,7 +36,7 @@ menu Copy and Cut checks on `tests/fixtures/editor-context-selection.md`:
 
 - `ClipboardHolder` (`tests/clipboard_snapshot.h`) opens the clipboard on
   another thread and holds it, as those programs do;
-- held for a second: menu Cut and Ctrl+X leave the text and selection;
+- held for two seconds: menu Cut and Ctrl+X leave the text and selection;
 - held for 20 ms: Ctrl+X waits, cuts exactly the selection and puts it on
   the clipboard, and Undo brings the text back.
 
@@ -63,8 +63,9 @@ afterwards. Screenshots are in `out/verify-cut/` (ignored).
 
 ## Limitations
 
-- A clipboard held for longer than about 50 ms still makes Cut and Copy do
-  nothing, now without losing text. There is no message for it.
-- Copies outside the editor (the reading view's Ctrl+C, a code block's Copy
-  button, table and file path copies) still try once, as before; none of
-  them deletes anything.
+- A clipboard held for longer than about 200 ms still makes Cut and Copy do
+  nothing, without losing text. Since
+  `tests/clipboard-busy-validation.md`, they say "Clipboard busy — nothing
+  copied", and the copies outside the editor (the reading view's Ctrl+C, a
+  code block's Copy button, table and file path copies) wait and warn the
+  same way.

@@ -205,6 +205,7 @@ int runReadingPositionTests(const char* file);
 int runSplitScrollbarTests(const char* file, const char* frontMatterFile, const char* longLinesFile);
 int runEditorDragTests(const char* file);
 int runTouchTests(const char* file);
+int runAutoScrollTests(const char* file);
 int runByteOrderMarkTests(const char* file, const char* frontMatterFile);
 int runSheetTests(const char* fixtureDir);
 int runLiveTests(const char* fixtureDir);
@@ -225,6 +226,7 @@ int main(int argc, char** argv) {
     if (argc >= 3 && argc <= 5 && std::string(argv[1]) == "--split-scrollbar-tests")
         return runSplitScrollbarTests(argv[2], argc >= 4 ? argv[3] : nullptr, argc == 5 ? argv[4] : nullptr);
     if (argc == 3 && std::string(argv[1]) == "--touch-tests") return runTouchTests(argv[2]);
+    if (argc == 3 && std::string(argv[1]) == "--autoscroll-tests") return runAutoScrollTests(argv[2]);
     if (argc == 3 && std::string(argv[1]) == "--editor-drag-tests") return runEditorDragTests(argv[2]);
     if (argc == 4 && std::string(argv[1]) == "--byte-order-mark-tests")
         return runByteOrderMarkTests(argv[2], argv[3]);

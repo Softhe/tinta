@@ -89,6 +89,7 @@ set(SOURCES
     src/context_menu.cpp
     src/input.cpp
     src/touch.cpp
+    src/autoscroll.cpp
     src/editor.cpp
     src/mermaid.cpp
     src/mermaid_ext.cpp
@@ -152,6 +153,7 @@ set(HEADERS
     include/overlays.h
     include/input.h
     include/touch.h
+    include/autoscroll.h
     include/editor.h
     include/mermaid.h
     include/mermaid_ext.h
@@ -212,7 +214,7 @@ if(BUILD_TESTING)
     # window, including layout-dependent character sequences (#195).
     set(INPUT_TEST_SOURCES ${SOURCES})
     list(REMOVE_ITEM INPUT_TEST_SOURCES src/main_d2d.cpp)
-    add_executable(input_tests tests/input_tests.cpp tests/deleted_tab_tests.cpp tests/file_change_tests.cpp tests/pinned_tab_tests.cpp tests/table_input_tests.cpp tests/docked_preview_tests.cpp tests/table_layout_tests.cpp tests/highlight_layout_tests.cpp tests/window_drag_tests.cpp tests/tab_drop_tests.cpp tests/tab_hover_card_tests.cpp tests/search_panel_tests.cpp tests/superscript_tests.cpp tests/sidepanel_tests.cpp tests/image_tests.cpp tests/search_input_tests.cpp tests/wrapped_cursor_tests.cpp tests/file_fragment_tests.cpp tests/editor_context_tests.cpp tests/editor_features_tests.cpp tests/ui_font_tests.cpp tests/print_export_tests.cpp tests/scroll_sync_tests.cpp tests/notification_setting_tests.cpp tests/goto_line_tests.cpp tests/reading_position_tests.cpp tests/split_scrollbar_tests.cpp tests/touch_tests.cpp tests/editor_drag_tests.cpp tests/byte_order_mark_tests.cpp tests/sheet_tests.cpp tests/live_tests.cpp tests/source_highlight_tests.cpp tests/math_markdown_tests.cpp ${INPUT_TEST_SOURCES})
+    add_executable(input_tests tests/input_tests.cpp tests/deleted_tab_tests.cpp tests/file_change_tests.cpp tests/pinned_tab_tests.cpp tests/table_input_tests.cpp tests/docked_preview_tests.cpp tests/table_layout_tests.cpp tests/highlight_layout_tests.cpp tests/window_drag_tests.cpp tests/tab_drop_tests.cpp tests/tab_hover_card_tests.cpp tests/search_panel_tests.cpp tests/superscript_tests.cpp tests/sidepanel_tests.cpp tests/image_tests.cpp tests/search_input_tests.cpp tests/wrapped_cursor_tests.cpp tests/file_fragment_tests.cpp tests/editor_context_tests.cpp tests/editor_features_tests.cpp tests/ui_font_tests.cpp tests/print_export_tests.cpp tests/scroll_sync_tests.cpp tests/notification_setting_tests.cpp tests/goto_line_tests.cpp tests/reading_position_tests.cpp tests/split_scrollbar_tests.cpp tests/touch_tests.cpp tests/autoscroll_tests.cpp tests/editor_drag_tests.cpp tests/byte_order_mark_tests.cpp tests/sheet_tests.cpp tests/live_tests.cpp tests/source_highlight_tests.cpp tests/math_markdown_tests.cpp ${INPUT_TEST_SOURCES})
     target_include_directories(input_tests PRIVATE include ${md4c_SOURCE_DIR}/src)
     target_link_libraries(input_tests PRIVATE $<TARGET_PROPERTY:tinta,LINK_LIBRARIES>)
     target_compile_definitions(input_tests PRIVATE $<TARGET_PROPERTY:tinta,COMPILE_DEFINITIONS>
@@ -362,6 +364,11 @@ if(BUILD_TESTING)
         -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/touch-test-$<CONFIG>
         -DTEST_DOC=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/touch-gestures-286.md
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_touch_tests.cmake)
+    add_test(NAME middle_click_autoscroll COMMAND ${CMAKE_COMMAND}
+        -DTEST_BINARY=$<TARGET_FILE:input_tests>
+        -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/autoscroll-test-$<CONFIG>
+        -DTEST_DOC=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/autoscroll-middle-click.md
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_autoscroll_tests.cmake)
     add_test(NAME tab_hover_card COMMAND ${CMAKE_COMMAND}
         -DTEST_BINARY=$<TARGET_FILE:input_tests>
         -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/tab-hover-card-test-$<CONFIG>
@@ -694,6 +701,24 @@ if(BUILD_TESTING)
     target_link_libraries(config_path_tests PRIVATE shell32)
     target_compile_definitions(config_path_tests PRIVATE UNICODE _UNICODE)
     add_test(NAME config_paths COMMAND config_path_tests)
+
+    # The system clipboard is one per session: these tests copy, paste and
+    # check what it holds, so under ctest -j one would read another's text.
+    # Each has its own folder; only the clipboard needs taking in turn.
+    set_tests_properties(
+        code_block_layout
+        editor_context_selection
+        editor_features
+        live_editor
+        notification_setting
+        search_input_focus
+        sheet_canvas
+        table_and_modifier_input
+        PROPERTIES RESOURCE_LOCK clipboard)
+    # These two open the real modal Save dialog (tests/save_picker.h). It
+    # takes the foreground as it activates and gives up after 5 seconds, so
+    # two at once would be cancelled out from under each other.
+    set_property(TEST deleted_tab sheet_canvas APPEND PROPERTY RESOURCE_LOCK foreground)
 endif()
 
 # Install
