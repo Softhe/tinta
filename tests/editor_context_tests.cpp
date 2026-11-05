@@ -166,7 +166,8 @@ void clipboardActions(App& app, const std::wstring& source) {
         // instead of deleting what it could not copy.
         app.editorScrollY = 0; select(app,word,word+9); point = characterPoint(app,word+2);
         {
-            ClipboardHolder held(1000);
+            // Long enough for each copy below to wait out its ~200 ms in turn
+            ClipboardHolder held(2000);
             check(held.opened, "another program holds the clipboard");
             app.signalChips.clear();
             right(app,point); menuAction(app,100);
@@ -217,7 +218,8 @@ void viewerCopies(App& app) {
         left(app,point);
     };
     {
-        ClipboardHolder held(1000);
+        // Five copies, each waiting about 200 ms, must all find it held
+        ClipboardHolder held(2000);
         check(held.opened, "another program holds the clipboard for the viewer");
         viewSelect(); app.signalChips.clear();
         key(app,'C',false,true);

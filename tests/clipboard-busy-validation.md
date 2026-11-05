@@ -40,7 +40,7 @@ at once, and many then claimed a copy that had not happened:
 `editor_context_selection` (`tests/editor_context_tests.cpp`), with another
 thread holding the clipboard (`ClipboardHolder`):
 
-- held for a second: menu Cut, Ctrl+X and Ctrl+C in the editor say the
+- held for two seconds: menu Cut, Ctrl+X and Ctrl+C in the editor say the
   clipboard is busy; in the viewer, Ctrl+C keeps the selection and says so,
   Ctrl+C with nothing selected claims no copy, and the code block's Copy,
   the table's Copy and Copy file path say the clipboard is busy without

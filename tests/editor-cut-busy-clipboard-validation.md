@@ -36,7 +36,7 @@ menu Copy and Cut checks on `tests/fixtures/editor-context-selection.md`:
 
 - `ClipboardHolder` (`tests/clipboard_snapshot.h`) opens the clipboard on
   another thread and holds it, as those programs do;
-- held for a second: menu Cut and Ctrl+X leave the text and selection;
+- held for two seconds: menu Cut and Ctrl+X leave the text and selection;
 - held for 20 ms: Ctrl+X waits, cuts exactly the selection and puts it on
   the clipboard, and Undo brings the text back.
 
