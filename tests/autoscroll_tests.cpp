@@ -152,12 +152,38 @@ void scenario(App& app, const char* path, int width, float scale) {
         if (!posted) Sleep(5);
     }
     check(posted, "the pacer posts a frame for the next refresh" + where);
+    // A frame reads the pointer and steps to the refresh's time: the mark set
+    // above where the pointer really is, so it runs down at that distance
+    {
+        auto& as = app.autoScroll;
+        POINT cursor{};
+        check(GetCursorPos(&cursor) && ScreenToClient(app.hwnd, &cursor), "the pointer can be read" + where);
+        as.origin = shifted(cursor, 0, -below);
+        as.held = false;
+        while (PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE)) {}
+        as.pacer->pending = true;  // as the pacer leaves it once it has posted
+        as.pacer->blankMs = as.ms + 16;
+        const float before = app.scrollY;
+        autoScrollFrame(app, app.hwnd);
+        const float framed = autoScrollSpeed(app, (float)below) * 16;
+        check(autoScrollActive(app) && std::fabs(app.scrollY - before - framed) < 1,
+              "a frame runs the page on by the refresh's time" + where + ": " +
+                  std::to_string(app.scrollY - before) + " for " + std::to_string(framed));
+        check(as.pacer && !as.pacer->pending, "after drawing, the frame lets the next refresh post" + where);
+        posted = false;
+        for (int i = 0; i < 100 && !posted; ++i) {
+            posted = PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE);
+            if (!posted) Sleep(5);
+        }
+        check(posted, "and the next refresh posts another" + where);
+    }
+    const float framedTo = app.scrollY;
     autoScrollEnd(app, app.hwnd);
     check(!app.autoScroll.pacer, "ending it lets the pacer go" + where);
     for (int i = 0; i < 100 && !pacer.expired(); ++i) Sleep(5);
     check(pacer.expired(), "the pacer's thread ends with it" + where);
     autoScrollFrame(app, app.hwnd);
-    check(app.scrollY == stopped && !autoScrollActive(app), "a frame posted before it ended does nothing" + where);
+    check(app.scrollY == framedTo && !autoScrollActive(app), "a frame posted before it ended does nothing" + where);
     while (PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE)) {}
 
     // At the end it waits for the pointer to turn back

@@ -220,9 +220,13 @@ bool autoScrollTick(App& app, HWND hwnd, double ms) {
 void autoScrollFrame(App& app, HWND hwnd) {
     const auto p = app.autoScroll.pacer;
     if (!p) return;  // posted before it ended
-    p->pending = false;
     // Drawn now, for this refresh, not when the queue next runs dry
     if (autoScrollTick(app, hwnd, p->blankMs)) UpdateWindow(hwnd);
+    // Only now may the next refresh post another. Posted messages come
+    // before input: a frame queued while this one drew would keep the click
+    // or key that stops it waiting for as long as frames draw slowly. The
+    // next one comes at a refresh after this, so input gets its turn first
+    p->pending = false;
 }
 
 bool autoScrollKey(App& app, HWND hwnd, WPARAM vk) {
