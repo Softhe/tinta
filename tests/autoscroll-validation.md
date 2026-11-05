@@ -103,13 +103,24 @@ builds with no warnings.
   `Middle-click autoscroll: 0 failures` (all eight theme/width/scale runs
   and the short page). After the fixes, `-R
   "middle_click_autoscroll|touch|input"` passed 5 of 5.
-- Whole suite, run serially (before and after the fixes): 61 of 62 passed. The exception is
-  `sheet_canvas`, which fails now and then at "the sheet copies as a Mermaid
-  flowchart": it reads the clipboard straight after writing it, so another
-  clipboard client can get there first. Run on its own it passed 3 times out
-  of 3, and this change touches neither sheets nor the clipboard.
-- Under `ctest -j 6`, six window and focus tests also failed (they compete
-  for focus); each passed when run again serially.
+- Whole suite, run serially, before the clipboard fixes: 61 of 62 passed.
+  The exception was `sheet_canvas`, which failed now and then at "the sheet
+  copies as a Mermaid flowchart". It read the clipboard straight after
+  writing it, and one `OpenClipboard` call failed with access denied
+  while another clipboard client briefly had it open.
+- Under `ctest -j 6`, six more tests failed; each passed when run again
+  serially. All of them use the system clipboard, so tests running at the
+  same time overwrote each other's copies.
+- Both causes are fixed in separate commits on this branch. The app now waits
+  up to about 200 ms for a busy clipboard, and the tests read their copies
+  back with a retry. ctest gives the clipboard tests a `clipboard` resource
+  lock, and the Save-dialog tests a `foreground` lock.
+- On the combined branch, run on a quiet machine: 0 warnings; the whole suite
+  passed 62 of 62 twice serially and twice with `-j 6` (about 26 s each).
+  `wrapped_cursor_navigation`, `search_results_panel` and `copy_file_path`
+  had each failed once while the real-window driver was sending real input
+  to the desktop at the same time. Run again on their own, each passed 20 of
+  20.
 
 ### Real window
 
