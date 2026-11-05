@@ -1390,14 +1390,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (sheetMiddleDown(*app, hwnd, mx, my)) return 0;
                 // Elsewhere it starts autoscroll on what it is pressed on
                 touchStopFling(*app, hwnd);
-                if (autoScrollBegin(*app, hwnd, POINT{mx, my}, touchClockMs())) return 0;
+                // (not while another button drives a drag)
+                if (!(wParam & (MK_LBUTTON | MK_RBUTTON)) && autoScrollBegin(*app, hwnd, POINT{mx, my}, touchClockMs()))
+                    return 0;
             }
             break;
 
         case WM_MBUTTONUP:
             if (app && autoScrollTakesRelease(*app, WM_MBUTTONUP)) return 0;
             if (app && autoScrollActive(*app)) {
-                autoScrollMiddleUp(*app, hwnd, touchClockMs());
+                autoScrollMiddleUp(*app, hwnd, POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}, touchClockMs());
                 return 0;
             }
             if (app && sheetMiddleUp(*app, hwnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam))) return 0;

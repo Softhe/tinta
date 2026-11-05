@@ -64,7 +64,8 @@ afterwards. Screenshots are in `out/verify-cut/` (ignored).
 ## Limitations
 
 - A clipboard held for longer than about 200 ms still makes Cut and Copy do
-  nothing, now without losing text. There is no message for it.
-- Copies outside the editor (the reading view's Ctrl+C, a code block's Copy
-  button, table and file path copies) still try once, as before; none of
-  them deletes anything.
+  nothing, without losing text. Since
+  `tests/clipboard-busy-validation.md`, they say "Clipboard busy — nothing
+  copied", and the copies outside the editor (the reading view's Ctrl+C, a
+  code block's Copy button, table and file path copies) wait and warn the
+  same way.

@@ -17,8 +17,9 @@
 bool autoScrollActive(const App& app);
 // WM_MBUTTONDOWN at a client point: true when autoscroll starts there
 bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms);
-// WM_MBUTTONUP: ends a hold that left the mark; a click stays on
-void autoScrollMiddleUp(App& app, HWND hwnd, double ms);
+// WM_MBUTTONUP at a client point: ends a hold that left the mark (by the
+// release point too); a click stays on
+void autoScrollMiddleUp(App& app, HWND hwnd, POINT pt, double ms);
 // WM_MOUSEMOVE while active (the window holds the mouse)
 void autoScrollPointer(App& app, HWND hwnd, POINT pt);
 // Any button pressed while active ends it; true when the press is taken,

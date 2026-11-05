@@ -102,7 +102,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     check(autoScrollBegin(app, app.hwnd, middle, ms), "a middle click on the page starts autoscroll" + where);
     check(app.autoScroll.target == TouchTarget::Document && app.autoScroll.acrossY,
           "it drives the page, down and up" + where);
-    autoScrollMiddleUp(app, app.hwnd, ms += 80);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 80);
     check(autoScrollActive(app) && !app.autoScroll.held && app.scrollY == 0,
           "released on the mark it stays on, and has not moved" + where);
     // Below the mark the page runs down at the speed for that distance
@@ -144,7 +144,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     // At the end it waits for the pointer to turn back
     app.scrollY = app.targetScrollY = maxY - dpi(app, 50);
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts near the end" + where);
-    autoScrollMiddleUp(app, app.hwnd, ms += 50);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 50);
     autoScrollPointer(app, app.hwnd, shifted(middle, 0, (int)dpi(app, 300)));
     run(app, 500);
     check(std::fabs(app.scrollY - maxY) < 0.5f && autoScrollActive(app), "it stops at the page's end and stays on" + where);
@@ -158,7 +158,7 @@ void scenario(App& app, const char* path, int width, float scale) {
 
     // Another key stops it and acts; Shift alone leaves it going
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts again" + where);
-    autoScrollMiddleUp(app, app.hwnd, ms += 50);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 50);
     keystroke(app, VK_SHIFT, KeyMods{false, true, false});
     check(autoScrollActive(app), "Shift alone leaves it going" + where);
     keystroke(app, VK_HOME);
@@ -169,7 +169,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     // a key stops it (and the key goes on to act)
     for (WPARAM key : {(WPARAM)VK_LEFT, (WPARAM)VK_DOWN}) {
         check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts for Alt" + where);
-        autoScrollMiddleUp(app, app.hwnd, ms += 50);
+        autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 50);
         check(!autoScrollKey(app, app.hwnd, VK_MENU) && autoScrollActive(app), "Alt alone leaves it going" + where);
         check(autoScrollKey(app, app.hwnd, key) && !autoScrollActive(app),
               "Alt with " + std::string(key == VK_LEFT ? "Left" : "Down") + " stops it" + where);
@@ -179,7 +179,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     // Scrolled elsewhere meanwhile (a jump, a relayout), it goes on from
     // there rather than pulling the page back
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts for a jump" + where);
-    autoScrollMiddleUp(app, app.hwnd, ms += 50);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 50);
     autoScrollPointer(app, app.hwnd, shifted(middle, 0, (int)dpi(app, 100)));
     run(app, 300);
     const float beforeJump = app.scrollY;
@@ -201,14 +201,19 @@ void scenario(App& app, const char* path, int width, float scale) {
     autoScrollPointer(app, app.hwnd, shifted(middle, 0, (int)dpi(app, 80)));
     run(app, 300);
     check(app.autoScroll.held && app.autoScroll.moved && app.scrollY > 0, "held off the mark, the page runs" + where);
-    autoScrollMiddleUp(app, app.hwnd, ms += 16);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 16);
     check(!autoScrollActive(app) && !autoScrollTakesRelease(app, WM_MBUTTONUP), "the release stops it there" + where);
     const float held = app.scrollY;
     autoScrollStep(app, app.hwnd, ms += 16);
     check(app.scrollY == held, "nothing runs after the release" + where);
+    // Released off the mark before any move came: the release point says it was a drag
+    check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "a hold starts for a quick release" + where);
+    autoScrollMiddleUp(app, app.hwnd, shifted(middle, 0, (int)dpi(app, 80)), ms += 16);
+    check(!autoScrollActive(app), "released off the mark with no move before it, it stops" + where);
+    resetPage(app);
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "another hold starts" + where);
     autoScrollPointer(app, app.hwnd, shifted(middle, (int)(mark * 0.6f), 0));
-    autoScrollMiddleUp(app, app.hwnd, ms += 400);
+    autoScrollMiddleUp(app, app.hwnd, app.autoScroll.pointer, ms += 400);
     check(autoScrollActive(app), "a hold that kept to the mark leaves it on, as a click does" + where);
     resetPage(app);
 
@@ -243,6 +248,13 @@ void scenario(App& app, const char* path, int width, float scale) {
     editFrame(app);
     const float textX = editRailWidth(app) + (editorPaneWidth(app) - editRailWidth(app)) / 2;
     const POINT inEditor{(LONG)textX, app.height / 2};
+    // Not while a selection or a text drag in the editor follows the left button
+    app.editorSelecting = true;
+    check(!autoScrollBegin(app, app.hwnd, inEditor, ms += 500), "an editor selection drag does not autoscroll" + where);
+    app.editorSelecting = false;
+    app.editorTextDrag.armed = true;
+    check(!autoScrollBegin(app, app.hwnd, inEditor, ms += 500), "an editor text drag does not autoscroll" + where);
+    app.editorTextDrag.armed = false;
     check(autoScrollBegin(app, app.hwnd, inEditor, ms += 500) && app.autoScroll.target == TouchTarget::Editor,
           "a middle click on the editor's text autoscrolls the editor" + where);
     autoScrollPointer(app, app.hwnd, shifted(inEditor, 0, (int)dpi(app, 80)));

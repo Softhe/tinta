@@ -50,7 +50,9 @@ bool autoScrollActive(const App& app) { return app.autoScroll.active; }
 
 bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms) {
     auto& a = app.autoScroll;
-    if (a.active || app.selecting || app.touch.active) return false;
+    // Not in the middle of a selection or text drag, on the page or in the editor
+    if (a.active || app.selecting || app.editorSelecting || app.editorTextDrag.armed || app.touch.active)
+        return false;
     PanelList list = PanelList::None;
     const TouchTarget target = touchTargetAt(app, pt, list);
     // A sheet pans with the middle button held, as before
@@ -81,9 +83,11 @@ bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms) {
     return true;
 }
 
-void autoScrollMiddleUp(App& app, HWND hwnd, double ms) {
+void autoScrollMiddleUp(App& app, HWND hwnd, POINT pt, double ms) {
     auto& a = app.autoScroll;
     if (!a.active || !a.held) return;
+    // Released off the mark before any move reached us: still a drag
+    autoScrollPointer(app, hwnd, pt);
     autoScrollStep(app, hwnd, ms);
     if (!a.active) return;
     a.held = false;
