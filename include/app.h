@@ -52,7 +52,7 @@ inline int64_t usElapsed(Clock::time_point start) {
 #define TIMER_TOUCH_HOLD 14
 #define TIMER_TOUCH_FLING 15
 #define TIMER_EDITOR_DRAG_SCROLL 16
-#define TIMER_AUTOSCROLL 17
+#define TIMER_AUTOSCROLL 17  // steps autoscroll where its pacer thread cannot (autoscroll.cpp)
 
 // Posted to continue an incomplete document layout in time-budgeted chunks
 #define WM_APP_LAYOUT_CHUNK (WM_APP + 1)
@@ -82,6 +82,10 @@ inline int64_t usElapsed(Clock::time_point start) {
 // completion callback posts this from the worker thread with (WPARAM)key
 // (todo 5 wires the handler; no App state is touched here yet)
 #define WM_APP_PLANTUML_READY (WM_APP + 7)
+
+// Posted by autoscroll's pacer thread once for each refresh of the window's
+// monitor, while autoscroll runs (autoscroll.cpp); one at a time
+#define WM_APP_AUTOSCROLL_FRAME (WM_APP + 8)
 
 // Startup metrics
 struct StartupMetrics {
@@ -190,6 +194,7 @@ inline D2D1_COLOR_F hexColor(uint32_t hex, float alpha = 1.0f) {
 
 // Forward declare App for dpi() helper
 struct App;
+struct AutoScrollPacer;  // autoscroll.cpp
 // A sheet open in a tab (sheet_ui.h)
 struct SheetDoc;
 
@@ -1025,6 +1030,9 @@ struct App {
         int tab = -1;
         std::string file;
         bool edit = false;
+        // Its thread posting WM_APP_AUTOSCROLL_FRAME at each refresh; none
+        // where it could not start, and the timer steps it instead
+        std::shared_ptr<AutoScrollPacer> pacer;
     } autoScroll;
     float tocAnimation = 0.0f;  // 0 to 1 slide-in from the chosen side
     // A clicked heading stays the active row even when the scroll cannot
