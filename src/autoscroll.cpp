@@ -14,14 +14,16 @@
 
 namespace {
 
-// The DXGI output that shows this monitor, to wait for its refreshes
+// The DXGI output that shows this monitor, to wait for its refreshes; none
+// when it cannot be found. Any failure ends a list, not only its end (a
+// driver resetting, a display going away), so a list never runs on forever
 Microsoft::WRL::ComPtr<IDXGIOutput> outputFor(HMONITOR monitor) {
     Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
     if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return nullptr;
     Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
-    for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+    for (UINT i = 0; SUCCEEDED(factory->EnumAdapters1(i, &adapter)) && adapter; ++i) {
         Microsoft::WRL::ComPtr<IDXGIOutput> output;
-        for (UINT j = 0; adapter->EnumOutputs(j, &output) != DXGI_ERROR_NOT_FOUND; ++j) {
+        for (UINT j = 0; SUCCEEDED(adapter->EnumOutputs(j, &output)) && output; ++j) {
             DXGI_OUTPUT_DESC desc;
             if (SUCCEEDED(output->GetDesc(&desc)) && desc.Monitor == monitor) return output;
         }
