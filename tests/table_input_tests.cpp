@@ -55,7 +55,7 @@ void tableActions(App& app) {
     check(clipboard.captured, "table action tests preserve the clipboard");
     auto copiedText = [&] {
         std::wstring text;
-        if (openClipboard(app.hwnd)) {
+        if (ClipboardSnapshot::open(app.hwnd)) {
             HANDLE data = GetClipboardData(CF_UNICODETEXT);
             if (data) if (const auto* p = (const wchar_t*)GlobalLock(data)) {
                 text = p;

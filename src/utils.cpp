@@ -226,10 +226,12 @@ void handleLinkClick(App& app) {
     }
 }
 
+// Clipboard history and Remote Desktop's clipboard sync open the clipboard
+// for a moment after each change; wait up to 200 ms for them to let go.
 bool openClipboard(HWND hwnd, bool* held) {
-    for (int attempt = 0; attempt < 10; ++attempt) {
+    for (int attempt = 0; attempt < 20; ++attempt) {
         if (OpenClipboard(hwnd)) return true;
-        Sleep(5);
+        Sleep(10);
     }
     if (held) *held = true;
     return false;

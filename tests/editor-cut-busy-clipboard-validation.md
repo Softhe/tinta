@@ -19,7 +19,7 @@ previous copy on the clipboard.
 
 ## Change
 
-- The editor's copy retries for up to about 50 ms (10 tries, 5 ms apart),
+- The editor's copy retries for up to about 200 ms (20 tries, 10 ms apart),
   as the table cell editor and the Find field already do, and reports
   whether the text reached the clipboard. It uses the shared
   `copyToClipboard` instead of its own copy of it.
@@ -63,7 +63,7 @@ afterwards. Screenshots are in `out/verify-cut/` (ignored).
 
 ## Limitations
 
-- A clipboard held for longer than about 50 ms still makes Cut and Copy do
+- A clipboard held for longer than about 200 ms still makes Cut and Copy do
   nothing, now without losing text. There is no message for it.
 - Copies outside the editor (the reading view's Ctrl+C, a code block's Copy
   button, table and file path copies) still try once, as before; none of

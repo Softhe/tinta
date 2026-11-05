@@ -480,7 +480,8 @@ void commands(App& app, SheetDoc& doc, const fs::path& dir, const fs::path& out)
         ClipboardSnapshot saved(app.hwnd);
         runAction(app, app.hwnd, doc, ACT_COPY_MERMAID);
         std::wstring text;
-        if (OpenClipboard(app.hwnd)) {
+        // Clipboard history opens it for a moment after each change
+        if (ClipboardSnapshot::open(app.hwnd)) {
             if (HANDLE h = GetClipboardData(CF_UNICODETEXT)) {
                 if (auto* p = static_cast<const wchar_t*>(GlobalLock(h))) {
                     text = p;

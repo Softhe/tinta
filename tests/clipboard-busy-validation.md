@@ -22,7 +22,7 @@ at once, and many then claimed a copy that had not happened:
 ## Change
 
 - `openClipboard` (`utils.h`) opens the clipboard trying again for up to
-  about 50 ms (10 tries, 5 ms apart). Every clipboard read and write goes
+  about 200 ms (20 tries, 10 ms apart). Every clipboard read and write goes
   through it: the copies above, the rich copy (#285), the diagram image
   copies, and the pastes of the editor, the Find field, table cells and
   annotation notes. The editor's and the table cell editor's own retry
