@@ -1,8 +1,8 @@
 # Middle-click autoscroll
 
-**Not yet validated on Windows.** The change was written on a Linux machine
-with no Windows toolchain. Nothing below has been compiled or run yet: the
-build, `middle_click_autoscroll` and the manual checks are still to do.
+Written on a Linux machine, then built and checked on Windows 11 (26200)
+with Visual Studio 2022 Build Tools (MSVC, `/W4`) and its bundled CMake. See
+[Windows results](#windows-results) at the end.
 
 ## Request
 
@@ -39,8 +39,14 @@ panned sheets.
 - **Stopping**: any button press (that press and its own release do nothing
   else, so a right click opens no menu), the wheel, a change of tab, file or
   mode, closing Help, lost focus or capture. Esc stops it and does nothing
-  else. Another key stops it and then acts (Home goes to the top). Shift,
-  Ctrl, Alt and Windows pressed alone leave it going.
+  else. Another key stops it and then acts (Home goes to the top), and so
+  does Alt with a key (`WM_SYSKEYDOWN`: Alt+Left/Right history, Alt+Up/Down
+  line moves, Alt+F4). Shift, Ctrl, Alt and Windows pressed alone leave it
+  going. Both key paths go through `autoScrollKey`.
+- **Other scrolling meanwhile**: autoscroll keeps its own sub-pixel
+  position, but each step first compares the target with where it last left
+  it. If something else moved it by more than a pixel (a jump, a relayout),
+  it goes on from there instead of pulling the page back.
 - Touch panning on a Live page now reaches the end of the page as the wheel
   does (`livePageHeight`), since both use the same range.
 
@@ -67,6 +73,10 @@ portable run). In themes 0 and 5, at 1050 and 650 px, at 1x and 1.5x:
 - at the page's end it stays on and runs back up when the pointer turns;
   Esc stops it without scrolling, Shift alone leaves it going, Home stops
   it and goes to the top;
+- Alt alone leaves it going; Alt with Left, and Alt with Down, stop it;
+- scrolled elsewhere while it runs (1500 DIP down, then back to the top), it
+  runs on from the new place each time. Without the step's check, the page
+  was pulled back to where autoscroll had left it, and these checks failed;
 - a hold dragged off the mark stops at the release; one that stays on the
   mark acts as a click;
 - across a page wider than the window (at 650 px), only across;
@@ -78,19 +88,103 @@ The window procedure's routing (wheel, button messages, focus and capture
 loss, the cursor read on each tick) is not covered by the harness, which
 calls the handlers directly.
 
-## Manual checks still to do
+## Windows results
 
-In the built app, with the fixture, at normal and narrow widths, in a light
-and a dark theme:
+### Build
 
-1. Middle-click mid-page; move below, above, far below; check the mark,
-   the cursor and the speed; stop with a click, a right click (no menu),
-   the wheel, Esc and Home.
-2. Hold the middle button, drag down, release: it stops there.
-3. Move the pointer outside the window while it runs after a click.
-4. Narrow the window until the table scrolls across; check the four-way
-   mark and the sideways scroll.
-5. In Source with the preview, on the editor and on the preview; in Live;
-   on the Contents (Tab), the file browser (B) and Help (F1).
-6. Middle-click a tab (it closes) and a sheet (it pans), as before.
-7. Alt+Tab away while it runs: it stops.
+`cmake -S . -B build` and `cmake --build build --config Release`: built
+first time, with no errors and no warnings at `/W4`. No source change was
+needed to build. After the Alt-key and other-scrolling fixes it still
+builds with no warnings.
+
+### Automated
+
+- `ctest -C Release -R middle_click_autoscroll`: passed, printing
+  `Middle-click autoscroll: 0 failures` (all eight theme/width/scale runs
+  and the short page). After the fixes, `-R
+  "middle_click_autoscroll|touch|input"` passed 5 of 5.
+- Whole suite, run serially (before and after the fixes): 61 of 62 passed. The exception is
+  `sheet_canvas`, which fails now and then at "the sheet copies as a Mermaid
+  flowchart": it reads the clipboard straight after writing it, so another
+  clipboard client can get there first. Run on its own it passed 3 times out
+  of 3, and this change touches neither sheets nor the clipboard.
+- Under `ctest -j 6`, six window and focus tests also failed (they compete
+  for focus); each passed when run again serially.
+
+### Real window
+
+The built `tinta.exe` was run as a portable copy in
+`build/autoscroll-manual/` (git-ignored: settings, screenshots and CSV
+results stay there) with the fixture open. Real mouse and keyboard input came
+through `SendInput`, so it passed through the message loop, the capture and
+the timer. Motion was judged by comparing three `PrintWindow` captures 300
+ms apart. The driver is `build/autoscroll-manual/drive-window.ps1` (Windows
+PowerShell 5.1). It brings Tinta to the front past the foreground lock, and
+it refuses to press a button unless Tinta is in front, so no click reaches
+another application. A watcher records every other window that takes the
+front during a run.
+
+Final runs, after the fixes: primary monitor at 1300 and 650 px wide, twice
+each, and the second monitor (negative screen coordinates) at 1300 px. All
+at 96 DPI, in the dark default theme, 24 checks a run: 0 failures in all
+five. The only other windows in front were Explorer's Alt+Tab switcher and
+the window Alt+Tab switched to.
+
+Two things on this machine had to be worked around first; neither is a
+fault in Tinta:
+
+- Another program holds **Home, End and PageDown as global hotkeys**
+  (`RegisterHotKey` for them fails with 1409), so their key-downs never
+  reach any application; only the key-ups arrive. A temporary message log
+  confirmed Tinta never received `WM_KEYDOWN` for Home. The driver goes back
+  to the top with the wheel instead. Home's stop-and-act behaviour is
+  covered by `middle_click_autoscroll`.
+- Earlier runs failed intermittently while another `input_tests` run was
+  open: its "Save As" and "Name the new sheet" windows took the front, and
+  Tinta, losing activation, correctly ended autoscroll. Runs with nothing
+  else in front were clean.
+
+Passed in every final run:
+
+- an idle page stays still; a middle click then a pointer below the mark
+  runs it down; back on the mark it waits;
+- **after a click, the pointer moved 120 px below the window's bottom edge
+  still steers it** (the per-tick `GetCursorPos`/`ScreenToClient` read;
+  correct on the second monitor's negative coordinates too);
+- Esc stops it and does nothing else (the app was not quit, which an
+  unconsumed Esc on a bare page would do);
+- **Alt+Tab while it runs stops it**, and it is still stopped on return;
+- **focus lost with the middle button held stops it**; the button released
+  in the other window leaves nothing stuck, and a later middle click starts
+  a fresh run;
+- the wheel stops it; a hold dragged off the mark stops at the release;
+- a left click stops it; a right click stops it;
+- **Alt held alone leaves it going; Alt+Down then stops it**, and Tinta
+  stays in front;
+- a pointer 40 px right of the mark scrolls across at 1300 and at 650 px,
+  measured over 150 ms straight after the start. The four-way mark is drawn
+  with the right chevron in the accent;
+- a right click while it runs opens no context menu. Esc decides it: with a
+  menu open, Esc would close the menu and Tinta would stay; Tinta quit, so no
+  menu was open and the click had already stopped autoscroll.
+
+Seen in the code on Windows: the process is Per-Monitor V2 DPI-aware, so
+`GetCursorPos` + `ScreenToClient` and the mouse message `lParam` are both
+physical client pixels, as `autoScrollPointer` expects; speeds are in DIP
+through `contentScale`. The window class has no `CS_DBLCLKS`, so a quick
+second click arrives as `WM_xBUTTONDOWN`, not `DBLCLK`, and is taken.
+`WM_SETCURSOR` is not sent while the window holds the capture, so the
+cursor set on each move and tick stays.
+
+### Remaining
+
+- Home, End and PageDown during autoscroll were not driven in the real
+  window: on this machine another program takes their key-downs. The
+  harness covers Home.
+- Hi-DPI was not checked in a real window: both monitors here are at 100%.
+  Only the harness's 1.5x runs cover it.
+- Not driven in the real window: the cursor's shape (it does not show in
+  `PrintWindow`) and how it looks over another application's window, a
+  light theme, Source/preview, Live, Contents, file browser, Help, a tab's
+  middle-click close and a sheet's pan. The harness covers each target's
+  logic, but not through the window procedure.

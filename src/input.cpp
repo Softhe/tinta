@@ -3770,11 +3770,7 @@ bool handleKeyDown(App& app, HWND hwnd, WPARAM wParam) {
     tabHoverCardDismiss(app, hwnd);
     // A key stops autoscroll: Esc only that, another key goes on to act.
     // Shift, Ctrl, Alt and Windows alone leave it going.
-    if (autoScrollActive(app) && wParam != VK_SHIFT && wParam != VK_CONTROL && wParam != VK_MENU &&
-        wParam != VK_LWIN && wParam != VK_RWIN) {
-        autoScrollEnd(app, hwnd);
-        if (wParam == VK_ESCAPE) return true;
-    }
+    if (autoScrollKey(app, hwnd, wParam) && wParam == VK_ESCAPE) return true;
     // Ctrl+Alt+Up/Down add editor carets (#251) before the AltGr guard
     if (editorAltArrowKey(app, hwnd, wParam)) return true;
     if (!shortcutModifiersAllowed(static_cast<unsigned>(wParam))) return false;

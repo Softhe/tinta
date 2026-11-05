@@ -165,6 +165,36 @@ void scenario(App& app, const char* path, int width, float scale) {
     check(!autoScrollActive(app) && app.targetScrollY == 0, "Home stops it and goes to the top" + where);
     resetPage(app);
 
+    // Alt keys come as WM_SYSKEYDOWN: Alt alone leaves it going, Alt with
+    // a key stops it (and the key goes on to act)
+    for (WPARAM key : {(WPARAM)VK_LEFT, (WPARAM)VK_DOWN}) {
+        check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts for Alt" + where);
+        autoScrollMiddleUp(app, app.hwnd, ms += 50);
+        check(!autoScrollKey(app, app.hwnd, VK_MENU) && autoScrollActive(app), "Alt alone leaves it going" + where);
+        check(autoScrollKey(app, app.hwnd, key) && !autoScrollActive(app),
+              "Alt with " + std::string(key == VK_LEFT ? "Left" : "Down") + " stops it" + where);
+    }
+    resetPage(app);
+
+    // Scrolled elsewhere meanwhile (a jump, a relayout), it goes on from
+    // there rather than pulling the page back
+    check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts for a jump" + where);
+    autoScrollMiddleUp(app, app.hwnd, ms += 50);
+    autoScrollPointer(app, app.hwnd, shifted(middle, 0, (int)dpi(app, 100)));
+    run(app, 300);
+    const float beforeJump = app.scrollY;
+    const float jumpTo = beforeJump + dpi(app, 1500);
+    app.scrollY = app.targetScrollY = jumpTo;
+    run(app, 100);
+    check(app.scrollY > jumpTo && app.scrollY < jumpTo + dpi(app, 200),
+          "after a jump down it runs on from the new place" + where + ": " + std::to_string(app.scrollY) +
+              " from " + std::to_string(jumpTo));
+    app.scrollY = app.targetScrollY = 0;
+    run(app, 100);
+    check(app.scrollY > 0 && app.scrollY < dpi(app, 200),
+          "after a jump to the top it runs on from the top" + where + ": " + std::to_string(app.scrollY));
+    resetPage(app);
+
     // A hold: dragged off the mark, the release stops it; a hold that
     // stays on the mark is a click
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "a held middle button starts autoscroll" + where);

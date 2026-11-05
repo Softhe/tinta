@@ -1020,6 +1020,7 @@ struct App {
         bool acrossX = false, acrossY = false;  // the ways it can go
         POINT origin{}, pointer{};  // client pixels
         float x = 0, y = 0;         // where the scroll has got to
+        float leftX = 0, leftY = 0; // where it last left the target, to notice another scroll
         double ms = 0;              // the last step
         int tab = -1;
         std::string file;

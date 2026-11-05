@@ -1698,6 +1698,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_SYSKEYDOWN:
             if (app) tabHoverCardDismiss(*app, hwnd);
+            // Alt with a key stops autoscroll too, then goes on to act
+            if (app) autoScrollKey(*app, hwnd, wParam);
             // A fresh Alt press (not its autorepeat) starts a new gesture
             if (app && wParam == VK_MENU && !(lParam & (1 << 30))) {
                 app->altClickGuard = false;

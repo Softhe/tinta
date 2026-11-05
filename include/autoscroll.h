@@ -26,6 +26,9 @@ void autoScrollPointer(App& app, HWND hwnd, POINT pt);
 // window procedure asks autoScrollTakesRelease with each release
 bool autoScrollTakesPress(App& app, HWND hwnd, UINT release);
 bool autoScrollTakesRelease(App& app, UINT release);
+// A key down (WM_KEYDOWN or WM_SYSKEYDOWN) while active: any key but
+// Shift, Ctrl, Alt or Windows alone ends it; true when it did
+bool autoScrollKey(App& app, HWND hwnd, WPARAM vk);
 // TIMER_AUTOSCROLL: one step; false once it has ended
 bool autoScrollStep(App& app, HWND hwnd, double ms);
 // Ends it: a key, the wheel, lost focus or capture, another document

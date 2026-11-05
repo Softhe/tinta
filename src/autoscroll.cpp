@@ -70,6 +70,8 @@ bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms) {
     a.file = app.currentFile;
     a.edit = app.editMode;
     touchScrollPosition(app, target, list, a.x, a.y);
+    a.leftX = a.x;
+    a.leftY = a.y;
     // Moves keep coming outside the window, and the next click anywhere
     // comes here to end it
     SetCapture(hwnd);
@@ -137,10 +139,24 @@ bool autoScrollStep(App& app, HWND hwnd, double ms) {
     const float vx = a.acrossX ? autoScrollSpeed(app, (float)(a.pointer.x - a.origin.x)) : 0.0f;
     const float vy = a.acrossY ? autoScrollSpeed(app, (float)(a.pointer.y - a.origin.y)) : 0.0f;
     if (vx == 0 && vy == 0) return true;
+    // Something else moved it meanwhile (a jump, a relayout): go on from there
+    float nowX, nowY;
+    touchScrollPosition(app, a.target, a.list, nowX, nowY);
+    if (std::fabs(nowX - a.leftX) > 1) a.x = nowX;
+    if (std::fabs(nowY - a.leftY) > 1) a.y = nowY;
     a.x += vx * (float)dt;
     a.y += vy * (float)dt;
     // Held at an end, it waits there for the pointer to turn back
     touchScrollTo(app, a.target, a.list, a.x, a.y);
+    touchScrollPosition(app, a.target, a.list, a.leftX, a.leftY);
+    return true;
+}
+
+bool autoScrollKey(App& app, HWND hwnd, WPARAM vk) {
+    if (!app.autoScroll.active || vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || vk == VK_LWIN ||
+        vk == VK_RWIN)
+        return false;
+    autoScrollEnd(app, hwnd);
     return true;
 }
 
