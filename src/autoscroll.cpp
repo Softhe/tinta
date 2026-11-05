@@ -5,10 +5,56 @@
 #include "input.h"
 #include "touch.h"
 
+#include <dxgi.h>
+#include <wrl/client.h>
+
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 namespace {
+
+// The DXGI output that shows this monitor, to wait for its refreshes
+Microsoft::WRL::ComPtr<IDXGIOutput> outputFor(HMONITOR monitor) {
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return nullptr;
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+        Microsoft::WRL::ComPtr<IDXGIOutput> output;
+        for (UINT j = 0; adapter->EnumOutputs(j, &output) != DXGI_ERROR_NOT_FOUND; ++j) {
+            DXGI_OUTPUT_DESC desc;
+            if (SUCCEEDED(output->GetDesc(&desc)) && desc.Monitor == monitor) return output;
+        }
+    }
+    return nullptr;
+}
+
+void pace(std::shared_ptr<AutoScrollPacer> p, HWND hwnd) {
+    HMONITOR monitor = nullptr;
+    Microsoft::WRL::ComPtr<IDXGIOutput> output;
+    double last = touchClockMs();
+    while (!p->stop) {
+        // The screen it is on now, should the window have moved
+        const HMONITOR now = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if (now != monitor) {
+            monitor = now;
+            output = outputFor(monitor);
+        }
+        // With no output to wait on (a remote session's display), about
+        // as often as the timer did
+        if (!output || FAILED(output->WaitForVBlank())) Sleep(8);
+        const double ms = touchClockMs();
+        // A wait that returns at once (a screen switched off) must not spin
+        if (ms - last < 1.0) {
+            Sleep(1);
+            continue;
+        }
+        last = ms;
+        if (p->stop) break;
+        p->blankMs = ms;
+        if (!p->pending.exchange(true) && !PostMessageW(hwnd, WM_APP_AUTOSCROLL_FRAME, 0, 0)) break;
+    }
+}
 
 constexpr float kMarkDip = 14.0f;       // the mark's radius: nothing moves within it
 constexpr float kSpeedFactor = 0.0032f;  // DIP per ms at 1 DIP past the mark, before the curve
@@ -77,7 +123,13 @@ bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms) {
     // Moves keep coming outside the window, and the next click anywhere
     // comes here to end it
     SetCapture(hwnd);
-    SetTimer(hwnd, TIMER_AUTOSCROLL, 16, nullptr);
+    a.pacer = std::make_shared<AutoScrollPacer>();
+    try {
+        std::thread(pace, a.pacer, hwnd).detach();
+    } catch (const std::system_error&) {
+        a.pacer.reset();
+        SetTimer(hwnd, TIMER_AUTOSCROLL, 16, nullptr);
+    }
     setCursor(a);
     InvalidateRect(hwnd, nullptr, FALSE);
     return true;
@@ -156,6 +208,23 @@ bool autoScrollStep(App& app, HWND hwnd, double ms) {
     return true;
 }
 
+bool autoScrollTick(App& app, HWND hwnd, double ms) {
+    // With no button down, moves stop coming once the pointer leaves the
+    // window: each step reads where it is
+    POINT cursor;
+    if (app.autoScroll.active && GetCursorPos(&cursor) && ScreenToClient(hwnd, &cursor))
+        autoScrollPointer(app, hwnd, cursor);
+    return autoScrollStep(app, hwnd, ms);
+}
+
+void autoScrollFrame(App& app, HWND hwnd) {
+    const auto p = app.autoScroll.pacer;
+    if (!p) return;  // posted before it ended
+    p->pending = false;
+    // Drawn now, for this refresh, not when the queue next runs dry
+    if (autoScrollTick(app, hwnd, p->blankMs)) UpdateWindow(hwnd);
+}
+
 bool autoScrollKey(App& app, HWND hwnd, WPARAM vk) {
     if (!app.autoScroll.active || vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || vk == VK_LWIN ||
         vk == VK_RWIN)
@@ -168,6 +237,9 @@ void autoScrollEnd(App& app, HWND hwnd) {
     auto& a = app.autoScroll;
     if (!a.active) return;
     a.active = a.held = false;
+    // The thread ends at its next refresh; it holds its own reference
+    if (a.pacer) a.pacer->stop = true;
+    a.pacer.reset();
     KillTimer(hwnd, TIMER_AUTOSCROLL);
     if (GetCapture() == hwnd) ReleaseCapture();
     // Hover and the cursor come back for where the pointer is now

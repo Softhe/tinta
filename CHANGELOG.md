@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Middle-click autoscroll moves smoothly. It stepped on a timer that came about 40 times a second at uneven intervals, so the page jumped, most of all on a 144 or 240 Hz screen; it now moves once for each refresh of the screen the window is on, the same distance each frame
+
 ## [v4.0.3] - 2026-11-05
 
 ### Added

@@ -141,6 +141,25 @@ void scenario(App& app, const char* path, int width, float scale) {
     autoScrollStep(app, app.hwnd, ms += 16);
     check(app.scrollY == stopped, "once stopped, a stray step does nothing" + where);
 
+    // Its steps come at each refresh of the screen, from a thread of its own
+    check(autoScrollBegin(app, app.hwnd, middle, ms += 500) && app.autoScroll.pacer,
+          "it starts a pacer for the screen's refreshes" + where);
+    const std::weak_ptr<AutoScrollPacer> pacer = app.autoScroll.pacer;
+    MSG frame{};
+    bool posted = false;
+    for (int i = 0; i < 100 && !posted; ++i) {
+        posted = PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE);
+        if (!posted) Sleep(5);
+    }
+    check(posted, "the pacer posts a frame for the next refresh" + where);
+    autoScrollEnd(app, app.hwnd);
+    check(!app.autoScroll.pacer, "ending it lets the pacer go" + where);
+    for (int i = 0; i < 100 && !pacer.expired(); ++i) Sleep(5);
+    check(pacer.expired(), "the pacer's thread ends with it" + where);
+    autoScrollFrame(app, app.hwnd);
+    check(app.scrollY == stopped && !autoScrollActive(app), "a frame posted before it ended does nothing" + where);
+    while (PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE)) {}
+
     // At the end it waits for the pointer to turn back
     app.scrollY = app.targetScrollY = maxY - dpi(app, 50);
     check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts near the end" + where);

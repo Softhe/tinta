@@ -29,9 +29,18 @@ panned sheets.
   page is wider than the window, in which case it scrolls across too.
 - **Speed**: nothing within 14 DIP of the mark. Past that, speed in DIP per
   ms = 0.0032 x (DIP past the mark)^1.3, capped at 8: about 500 DIP/s at 50
-  DIP past the mark and 5000 DIP/s at 300. The timer ticks every 16 ms, and a
-  late tick moves at most 50 ms' worth. At an end it waits for the pointer to
-  turn back.
+  DIP past the mark and 5000 DIP/s at 300. It steps once for each refresh
+  of the screen the window is on (see Frame pacing below), and a late step
+  moves at most 50 ms' worth. At an end it waits for the pointer to turn
+  back.
+- **Frame pacing**: a thread waits for each vertical blank of the window's
+  monitor (DXGI `WaitForVBlank`, the output found again if the window moves
+  to another screen) and posts `WM_APP_AUTOSCROLL_FRAME`, one at a time.
+  The window steps to that blank's time and draws at once (`UpdateWindow`).
+  Where no output can be waited on, the thread posts about every 15 ms;
+  where the thread cannot start, `TIMER_AUTOSCROLL` (16 ms) steps it as
+  before. The thread stops with autoscroll and holds its own reference, so
+  ending never waits for it.
 - **Click or hold**: released without leaving the mark, it stays on (the
   window keeps the mouse, and each tick reads the cursor so the pointer
   steers outside the window too). Dragged off the mark with the button held,
@@ -187,13 +196,44 @@ second click arrives as `WM_xBUTTONDOWN`, not `DBLCLK`, and is taken.
 `WM_SETCURSOR` is not sent while the window holds the capture, so the
 cursor set on each move and tick stays.
 
+### Frame pacing
+
+Reported after 4.0.3 from a screen recording: autoscroll looked choppy at
+any speed. Measured with temporary timing in the window procedure, Release
+build, a 2560x1400 window on README.md four times over, the pointer held
+200 px below the mark for 3 s:
+
+| | 240 Hz monitor | 75 Hz monitor |
+|---|---|---|
+| 4.0.3, 16 ms timer: steps in 3 s | 122 | - |
+| 4.0.3: time between steps | 16-31 ms, mostly 31, uneven | - |
+| Paced to the screen: frames in 3 s | 723 | 227 |
+| Paced: time between frames | 4.1-4.2 ms (715 of 723) | 13.3-13.4 ms (224 of 227) |
+
+Drawing a frame took 0.55-0.6 ms on average, at most about 1.1 ms. The cost
+was the timer, not the drawing: Windows rounds a 16 ms timer up to its
+15.6 ms tick, often two, and `WM_TIMER` waits behind other messages. The
+recording showed the same: the page changed every 17 or 33 ms of the 60 fps
+capture, with stalls up to 333 ms. In both paced runs the one gap of about
+230 ms was the script's pause on the mark before it moved the pointer.
+
+`middle_click_autoscroll` adds: autoscroll starts a pacer, the pacer posts a
+frame for the next refresh, ending it lets the pacer go and the thread ends,
+and a frame posted before the end does nothing. With the thread not started
+the posting check fails in every scenario. The full suite passed 62 of 62
+(`-j 6`), and the real-window driver 24 of 24 at 1300 and 650 px on the
+240 Hz monitor and at 1300 px on the 75 Hz one.
+
 ### Remaining
 
 - Home, End and PageDown during autoscroll were not driven in the real
   window: on this machine another program takes their key-downs. The
   harness covers Home.
-- Hi-DPI was not checked in a real window: both monitors here are at 100%.
-  Only the harness's 1.5x runs cover it.
+- Hi-DPI: before 4.0.3 the second monitor was set to 150% and the driver
+  passed 24 of 24 there at 144 DPI, the mark about 42 px across; the
+  monitor was set back to 100%. The paced frames were not run at 150%.
+- Smoothness itself is judged by eye: the measurements show even frame
+  timing, not how it looks.
 - Not driven in the real window: the cursor's shape (it does not show in
   `PrintWindow`) and how it looks over another application's window, a
   light theme, Source/preview, Live, Contents, file browser, Help, a tab's

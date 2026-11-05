@@ -3,6 +3,8 @@
 
 #include "app.h"
 
+#include <atomic>
+
 // Middle-click autoscroll, as Windows applications have it. The middle
 // button pressed on something that scrolls - the page, the editor's text,
 // the preview beside it, a side panel's list, Help - sets a mark there;
@@ -13,6 +15,18 @@
 // it stops at the release. Esc stops it and does nothing else; another key
 // stops it and goes on to do what it does. The tab strip's middle-click
 // and a sheet's middle-button pan are unchanged.
+
+// Steps autoscroll once for each refresh of the screen the window is on. A
+// 16 ms timer ticks every 15.6 or 31.2 ms instead, out of step with the
+// screen: the page moved in uneven jumps, about 40 a second, which on a
+// 144 or 240 Hz screen looks choppy. The thread waits for each vertical
+// blank and posts WM_APP_AUTOSCROLL_FRAME; the window steps to that blank's
+// time, so each frame moves the same distance, and draws at once
+struct AutoScrollPacer {
+    std::atomic<bool> stop{false};
+    std::atomic<bool> pending{false};  // a frame posted and not yet taken
+    std::atomic<double> blankMs{0};    // when the last refresh came
+};
 
 bool autoScrollActive(const App& app);
 // WM_MBUTTONDOWN at a client point: true when autoscroll starts there
@@ -30,8 +44,13 @@ bool autoScrollTakesRelease(App& app, UINT release);
 // A key down (WM_KEYDOWN or WM_SYSKEYDOWN) while active: any key but
 // Shift, Ctrl, Alt or Windows alone ends it; true when it did
 bool autoScrollKey(App& app, HWND hwnd, WPARAM vk);
-// TIMER_AUTOSCROLL: one step; false once it has ended
+// One step to the time given; false once it has ended
 bool autoScrollStep(App& app, HWND hwnd, double ms);
+// TIMER_AUTOSCROLL: reads where the pointer is, then steps
+bool autoScrollTick(App& app, HWND hwnd, double ms);
+// WM_APP_AUTOSCROLL_FRAME, posted at each refresh of the screen: steps to
+// the refresh's time and draws
+void autoScrollFrame(App& app, HWND hwnd);
 // Ends it: a key, the wheel, lost focus or capture, another document
 void autoScrollEnd(App& app, HWND hwnd);
 // The speed for the pointer this many pixels from the mark along one way,

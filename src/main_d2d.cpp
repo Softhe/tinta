@@ -1789,14 +1789,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (wParam == TIMER_TOUCH_HOLD && app) touchHold(*app, hwnd);
             if (wParam == TIMER_TOUCH_FLING && app) touchFlingStep(*app, hwnd, touchClockMs());
-            if (wParam == TIMER_AUTOSCROLL && app) {
-                // With no button down, moves stop coming once the pointer
-                // leaves the window: each step reads where it is
-                POINT cursor;
-                if (autoScrollActive(*app) && GetCursorPos(&cursor) && ScreenToClient(hwnd, &cursor))
-                    autoScrollPointer(*app, hwnd, cursor);
-                autoScrollStep(*app, hwnd, touchClockMs());
-            }
+            if (wParam == TIMER_AUTOSCROLL && app) autoScrollTick(*app, hwnd, touchClockMs());
             if (wParam == TIMER_EDITOR_DRAG_SCROLL && app) editorTextDragScroll(*app, hwnd);
             if (wParam == TIMER_IMAGE_REFLOW && app) {
                 // One relayout for however many images arrived since armed
@@ -1827,6 +1820,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // and reflow (handler takes ownership of the result)
             if (app) completeAsyncImage(*app, (void*)lParam);
             else discardAsyncImage((void*)lParam);
+            return 0;
+
+        case WM_APP_AUTOSCROLL_FRAME:
+            if (app) autoScrollFrame(*app, hwnd);
             return 0;
 
         case WM_APP_PLANTUML_READY:
