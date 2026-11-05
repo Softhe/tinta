@@ -1,5 +1,6 @@
 #include "frontmatter_ui.h"
 #include "input.h"
+#include "autoscroll.h"
 #include "live_editor.h"
 #include "sheet_ui.h"
 #include "touch.h"
@@ -3767,6 +3768,13 @@ static void toggleZenMode(App& app, HWND hwnd) {
 bool handleKeyDown(App& app, HWND hwnd, WPARAM wParam) {
     // Typing, scrolling and clicking all put the tab hover card away
     tabHoverCardDismiss(app, hwnd);
+    // A key stops autoscroll: Esc only that, another key goes on to act.
+    // Shift, Ctrl, Alt and Windows alone leave it going.
+    if (autoScrollActive(app) && wParam != VK_SHIFT && wParam != VK_CONTROL && wParam != VK_MENU &&
+        wParam != VK_LWIN && wParam != VK_RWIN) {
+        autoScrollEnd(app, hwnd);
+        if (wParam == VK_ESCAPE) return true;
+    }
     // Ctrl+Alt+Up/Down add editor carets (#251) before the AltGr guard
     if (editorAltArrowKey(app, hwnd, wParam)) return true;
     if (!shortcutModifiersAllowed(static_cast<unsigned>(wParam))) return false;

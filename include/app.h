@@ -52,6 +52,7 @@ inline int64_t usElapsed(Clock::time_point start) {
 #define TIMER_TOUCH_HOLD 14
 #define TIMER_TOUCH_FLING 15
 #define TIMER_EDITOR_DRAG_SCROLL 16
+#define TIMER_AUTOSCROLL 17
 
 // Posted to continue an incomplete document layout in time-budgeted chunks
 #define WM_APP_LAYOUT_CHUNK (WM_APP + 1)
@@ -1005,6 +1006,25 @@ struct App {
         std::string flingFile;
         bool flingEdit = false;
     } touch;
+    // Middle-click autoscroll: a press on something scrollable sets a
+    // mark, and the pointer's distance from it sets the speed and the way.
+    // Released where it was pressed, it carries on until the next click,
+    // key or wheel turn; dragged off the mark first, the release ends it.
+    struct AutoScroll {
+        bool active = false;
+        bool held = false;    // the middle button is still down
+        bool moved = false;   // the pointer left the mark while held
+        UINT swallowUp = 0;   // the release of the press that ended it (WM_xBUTTONUP): it does nothing
+        TouchTarget target = TouchTarget::None;
+        PanelList list = PanelList::None;
+        bool acrossX = false, acrossY = false;  // the ways it can go
+        POINT origin{}, pointer{};  // client pixels
+        float x = 0, y = 0;         // where the scroll has got to
+        double ms = 0;              // the last step
+        int tab = -1;
+        std::string file;
+        bool edit = false;
+    } autoScroll;
     float tocAnimation = 0.0f;  // 0 to 1 slide-in from the chosen side
     // A clicked heading stays the active row even when the scroll cannot
     // reach it (short documents); any real scroll hands back to the spy

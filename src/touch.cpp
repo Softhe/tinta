@@ -123,7 +123,9 @@ void scrollRange(const App& app, TouchTarget target, PanelList list, float& maxX
             break;
         case TouchTarget::Document:
             maxX = std::max(0.0f, app.contentWidth - documentViewportWidth(app));
-            maxY = std::max(0.0f, app.contentHeight - static_cast<float>(app.height));
+            // As far as the wheel goes: Live's page grows with the block open in it
+            maxY = std::max(0.0f, (editorLiveOn(app) ? livePageHeight(app) : app.contentHeight) -
+                                      static_cast<float>(app.height));
             break;
         case TouchTarget::Editor:
             // Unwrapped lines have no right end to stop at; the editor
@@ -303,6 +305,18 @@ void endGesture(App::TouchGesture& t) {
 }
 
 }  // namespace
+
+void touchScrollPosition(const App& app, TouchTarget target, PanelList list, float& x, float& y) {
+    scrollOf(app, target, list, x, y);
+}
+
+void touchScrollRange(const App& app, TouchTarget target, PanelList list, float& maxX, float& maxY) {
+    scrollRange(app, target, list, maxX, maxY);
+}
+
+bool touchScrollTo(App& app, TouchTarget target, PanelList list, float& x, float& y) {
+    return scrollTo(app, target, list, x, y);
+}
 
 double touchClockMs() {
     static const double perMs = [] {

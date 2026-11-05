@@ -32,6 +32,12 @@ void touchCancel(App& app, HWND hwnd);
 
 // What a finger landing at this point would drive
 TouchTarget touchTargetAt(const App& app, POINT pt, PanelList& list);
+// Where a target is scrolled to, how far each way it goes, and scrolling it
+// to a position kept within that range (written back; true when it moved).
+// Middle-click autoscroll drives the same targets.
+void touchScrollPosition(const App& app, TouchTarget target, PanelList list, float& x, float& y);
+void touchScrollRange(const App& app, TouchTarget target, PanelList list, float& maxX, float& maxY);
+bool touchScrollTo(App& app, TouchTarget target, PanelList list, float& x, float& y);
 // The clock pointer messages and the fling run on, in milliseconds
 double touchClockMs();
 
