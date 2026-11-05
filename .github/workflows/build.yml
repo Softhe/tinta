@@ -54,13 +54,10 @@ jobs:
             - Portable: download `tinta.exe` below and run it (SmartScreen may ask: "More info", then "Run anyway")
             - Optionally run `tinta.exe /register` to register Markdown, Mermaid and PlantUML files
 
-            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork, on top of 4.0.2. The Microsoft Store and winget versions are the original project's and do not include these changes. For what is new in 4.0 (Live and Sheets), see the [v4.0.0 notes](https://github.com/oipoistar/tinta/releases/tag/v4.0.0).
-
-            ### Added
-            - Middle-click autoscroll, as in other Windows applications: the middle button pressed on the page, the editor's text, the preview beside it, a side panel's list or Help sets a mark, and the pointer's distance above or below it sets the way and the speed. A page wider than the window scrolls across too. A click keeps it running until the next click, key or wheel turn (Esc only stops it); a hold dragged off the mark stops where it is let go. Tabs still close and sheets still pan with the middle button
+            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork, on top of 4.0.3. The Microsoft Store and winget versions are the original project's and do not include the fork's changes. For middle-click autoscroll, added in 4.0.3, see the [v4.0.3 notes](https://github.com/Softhe/tinta/releases/tag/v4.0.3).
 
             ### Fixed
-            - Copies and pastes wait up to about 200 ms instead of 50 ms for a clipboard that another program, such as clipboard history or Remote Desktop, holds for a moment
+            - Middle-click autoscroll moves smoothly. It stepped on a timer that came about 40 times a second at uneven intervals, so the page jumped, most of all on a 144 or 240 Hz screen; it now moves once for each refresh of the screen the window is on, the same distance each frame
 
             ### What's included
             - Export as HTML, DOCX, or PDF, plus optional Pandoc formats
