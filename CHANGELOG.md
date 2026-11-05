@@ -1,9 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v4.0.3] - 2026-11-05
 
 ### Added
 - Middle-click autoscroll, as in other Windows applications. The middle button pressed on the page, the editor's text, the preview beside it, a side panel's list or Help sets a round mark there, and moving the pointer above or below it scrolls up or down, faster the farther it goes; a page wider than the window scrolls across too. Released where it was pressed, it carries on until the next click, key or wheel turn, and Esc stops it without doing anything else; dragged off the mark with the button held, it stops where the button is let go. The tab strip's middle-click still closes a tab, and a sheet still pans with the middle button held
+
+### Fixed
+- Copies and pastes wait up to about 200 ms for a clipboard another program holds for a moment, such as clipboard history or Remote Desktop's clipboard sync; they gave up after about 50 ms, so a copy could be lost
 
 ## [v4.0.2] - 2026-11-03
 
