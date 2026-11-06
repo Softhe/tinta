@@ -54,10 +54,10 @@ jobs:
             - Portable: download `tinta.exe` below and run it (SmartScreen may ask: "More info", then "Run anyway")
             - Optionally run `tinta.exe /register` to register Markdown, Mermaid and PlantUML files
 
-            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork, on top of 4.0.3. The Microsoft Store and winget versions are the original project's and do not include the fork's changes. For middle-click autoscroll, added in 4.0.3, see the [v4.0.3 notes](https://github.com/Softhe/tinta/releases/tag/v4.0.3).
+            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork, on top of 4.0.4. The Microsoft Store and winget versions are the original project's and do not include the fork's changes. For middle-click autoscroll, added in 4.0.3, see the [v4.0.3 notes](https://github.com/Softhe/tinta/releases/tag/v4.0.3).
 
-            ### Fixed
-            - Middle-click autoscroll moves smoothly. It stepped on a timer that came about 40 times a second at uneven intervals, so the page jumped, most of all on a 144 or 240 Hz screen; it now moves once for each refresh of the screen the window is on, the same distance each frame
+            ### Changed
+            - Middle-click autoscroll gets going as soon as the pointer leaves the mark, and has no fixed top speed on long documents. Close to the mark it starts about twice as fast as before; farther out it keeps getting faster all the way to the edge of the screen, where it crosses the whole document in about a third of a second, so the pointer's distance picks any speed between a slow read and a dash to the end. It stopped getting faster about 400 pixels from the mark, so a long document took many seconds to cross
 
             ### What's included
             - Export as HTML, DOCX, or PDF, plus optional Pandoc formats
