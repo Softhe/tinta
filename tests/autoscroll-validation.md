@@ -27,9 +27,30 @@ panned sheets.
   chevron for each way it can go and the way it is going in the theme's
   accent. The cursor is the up-down arrow, or the four-way arrow when the
   page is wider than the window, in which case it scrolls across too.
-- **Speed**: nothing within 14 DIP of the mark. Past that, speed in DIP per
-  ms = 0.0032 x (DIP past the mark)^1.3, capped at 8: about 500 DIP/s at 50
-  DIP past the mark and 5000 DIP/s at 300. It steps once for each refresh
+- **Speed**: nothing within 14 DIP of the mark. Past that, up to the knee
+  80 DIP past the mark, in step with the distance: 950 DIP/s at the knee,
+  so 120 at 10 DIP past and 600 at 50 (4.0.4's curve gave 64 and 500 there:
+  it was slow to get going). From the knee, speed in DIP per ms = 0.0032 x
+  (DIP past the mark)^1.3, the same 950 DIP/s at the knee. Up to 4.0.4 this stopped at 8 DIP/ms,
+  reached 411 DIP past the mark: the rest of the screen added nothing, and a
+  long document took many seconds to cross at any setting. Now, when the
+  length to scroll is more than 8 DIP/ms crosses in 0.35 s, the curve past
+  the knee (without its stop) is multiplied by a boost: 1 at the knee,
+  growing out to the edge of the mark's screen
+  (`roomUp`/`roomDown`/`roomLeft`/`roomRight`, measured at the press),
+  where it crosses the whole length in 0.35 s; past the edge, on another
+  screen, no faster. Halfway out the boost has 0.5 - 0.35/4 of its
+  doublings, and each step out adds more. The boost is at least 1, so it only
+  rises, never slower than the curve alone, and an edge nearer than 200
+  DIP past the knee counts as that far. For a 30 000 DIP document and the
+  mark mid-screen at 1440 px, in DIP/s:
+
+  | DIP past the mark | 100 | 150 | 200 | 300 | 400 | 500 | 600 | 705 (edge) |
+  |---|---|---|---|---|---|---|---|---|
+  | 4.0.4 | 1270 | 2160 | 3140 | 5310 | 7720 | 8000 | 8000 | 8000 |
+  | now | 1320 | 2460 | 3950 | 8370 | 15 700 | 27 900 | 48 400 | 85 700 |
+
+  Shorter documents keep the curve and its 8 DIP/ms. It steps once for each refresh
   of the screen the window is on (see Frame pacing below), and a late step
   moves at most 50 ms' worth. At an end it waits for the pointer to turn
   back.
@@ -223,6 +244,44 @@ and a frame posted before the end does nothing. With the thread not started
 the posting check fails in every scenario. The full suite passed 62 of 62
 (`-j 6`), and the real-window driver 24 of 24 at 1300 and 650 px on the
 240 Hz monitor and at 1300 px on the 75 Hz one.
+
+### Speed past the knee
+
+Reported after 4.0.4: going fast, the speed stopped rising well short of
+the screen's edge, and a long document could not be crossed quickly.
+
+Then, trying it: slightly faster (0.35 s instead of 0.5 s across at the
+edge), the fast range starting closer to the mark (80 DIP past it instead
+of 120), and about 15 000 DIP/s halfway to the edge. With the first shape
+(the knee's speed doubling at even steps to the edge) a knee at 80 changed
+nothing below about 250 DIP, where the curve alone was still faster; the
+boost on the curve is faster from the knee on.
+
+`middle_click_autoscroll` checks, at 1x and 1.5x: up to the knee a long
+page goes as a short one; just past it, faster than the curve alone; at
+the edge it crosses the page in 0.35 s, upward as downward, and no faster
+past it; halfway out, the curve with its share of the boost, and about
+15 000 DIP/s for the 30 000 DIP document; it only rises and is never
+slower than the curve alone, on a tall screen too; a page short enough
+keeps the curve; with no edge known, or one near the mark, full speed
+comes 200 DIP past the knee; the press records the room to each edge; and
+two steps with the pointer at the edge move the page at that full speed.
+With the far range turned off five of those checks fail; with the knee
+back at 120, five; with the first shape back, three.
+
+Then: respond sooner at the start. Up to the knee the speed now rises in
+step with the distance instead of on the curve. Checked: about 120 DIP/s
+10 DIP past the mark, 600 at 50, twice as far twice as fast, and no jump
+at the knee. With the curve back below the knee, three of those fail. The
+full suite passed 62 of 62 (`-j 6`); in one earlier run `sheet_canvas`
+and one other test failed once and passed when run again.
+
+Real window, Release build, 2560x1400 on the 240 Hz monitor, README.md
+four times over: the mark a third of the way down and the pointer held
+900 px below it, about 70 px short of the screen's edge, for one second. The
+capture after that second shows the document's last line (`License`,
+`MIT`) with the scrollbar at the bottom; at the old 8 DIP/ms it would have
+gone about 8000 px.
 
 ### Remaining
 

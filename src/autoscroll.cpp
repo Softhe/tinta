@@ -61,8 +61,20 @@ void pace(std::shared_ptr<AutoScrollPacer> p, HWND hwnd) {
 constexpr float kMarkDip = 14.0f;       // the mark's radius: nothing moves within it
 constexpr float kSpeedFactor = 0.0032f;  // DIP per ms at 1 DIP past the mark, before the curve
 constexpr float kSpeedPower = 1.3f;      // farther goes faster, more than in step
-constexpr float kMaxDipPerMs = 8.0f;     // a screen in about a tenth of a second at most
-constexpr double kMaxStepMs = 50;        // a late timer does not leap
+constexpr float kMaxDipPerMs = 8.0f;     // where that curve stops: a screen in about a tenth of a second
+// Past the knee the curve, without its stop, is multiplied by a boost that
+// grows from 1 at the knee to what makes the screen's edge cross the whole
+// length in kAcrossMs: the rest of the screen sets the fast speeds, as
+// finely as the near ones, with no cap short of it
+constexpr float kKneeDip = 80.0f;    // past the mark: up to here only the curve above
+constexpr float kMinFarDip = 200.0f; // knee to full speed at least, the mark near an edge
+constexpr float kAcrossMs = 350.0f;  // the whole length, with the pointer at the edge
+// How the boost's doublings spread from knee to edge: halfway, 0.5 +
+// kBoostBend / 4 of them (fewer, as it is negative), and still more each
+// step. About 15 000 DIP/s halfway for a 30 000 DIP document, the mark
+// mid-screen at 1440 px
+constexpr float kBoostBend = -0.35f;
+constexpr double kMaxStepMs = 50;    // a late timer does not leap
 
 // Which way the pointer sets it going: -1, 0 or 1 along each way
 int heading(const App& app, float offset) {
@@ -86,11 +98,31 @@ bool sameContext(const App& app) {
 
 float autoScrollMarkRadius(const App& app) { return dpi(app, kMarkDip); }
 
-float autoScrollSpeed(const App& app, float offset) {
+float autoScrollSpeed(const App& app, float offset, float room, float range) {
     const float scale = std::max(app.contentScale, 0.01f);
     const float past = std::fabs(offset) / scale - kMarkDip;
     if (past <= 0) return 0;
-    const float dipPerMs = std::min(kSpeedFactor * std::pow(past, kSpeedPower), kMaxDipPerMs);
+    // Up to the knee in step with the distance, so it gets going as soon as
+    // the pointer leaves the mark (the curve there starts slowly); the curve
+    // past it, from the same speed at the knee
+    const float atKnee = kSpeedFactor * std::pow(kKneeDip, kSpeedPower);
+    float dipPerMs = past < kKneeDip ? atKnee * past / kKneeDip
+                                     : std::min(kSpeedFactor * std::pow(past, kSpeedPower), kMaxDipPerMs);
+    // Something too long to cross at that speed goes faster past the knee
+    const float top = range / scale / kAcrossMs;
+    if (past > kKneeDip && top > kMaxDipPerMs) {
+        // The screen's edge, or not much past the knee where it is near
+        const float reach = std::max(room / scale - kMarkDip, kKneeDip + kMinFarDip);
+        const float at = std::min(past, reach);
+        const float t = (at - kKneeDip) / (reach - kKneeDip);
+        const float curve = kSpeedFactor * std::pow(at, kSpeedPower);
+        const float edgeCurve = kSpeedFactor * std::pow(reach, kSpeedPower);
+        // A boost of at least 1, so it only rises: where the curve alone is
+        // already faster at the edge (a tall screen), that is the top
+        const float boost = std::max(top / edgeCurve, 1.0f);
+        const float share = t + kBoostBend * t * (1 - t);  // 0 to 1, rising throughout
+        dipPerMs = std::max(dipPerMs, curve * std::pow(boost, share));
+    }
     return std::copysign(dipPerMs * scale, offset);
 }
 
@@ -122,6 +154,17 @@ bool autoScrollBegin(App& app, HWND hwnd, POINT pt, double ms) {
     touchScrollPosition(app, target, list, a.x, a.y);
     a.leftX = a.x;
     a.leftY = a.y;
+    // How far the pointer can go each way, to the edges of the mark's screen
+    POINT screen = pt;
+    MONITORINFO monitor{sizeof(monitor)};
+    if (ClientToScreen(hwnd, &screen) &&
+        GetMonitorInfoW(MonitorFromPoint(screen, MONITOR_DEFAULTTONEAREST), &monitor)) {
+        const RECT& m = monitor.rcMonitor;
+        a.roomLeft = (float)std::max(0L, screen.x - m.left);
+        a.roomRight = (float)std::max(0L, m.right - 1 - screen.x);
+        a.roomUp = (float)std::max(0L, screen.y - m.top);
+        a.roomDown = (float)std::max(0L, m.bottom - 1 - screen.y);
+    }
     // Moves keep coming outside the window, and the next click anywhere
     // comes here to end it
     SetCapture(hwnd);
@@ -194,8 +237,11 @@ bool autoScrollStep(App& app, HWND hwnd, double ms) {
     const double dt = std::min(ms - a.ms, kMaxStepMs);
     if (dt <= 0) return true;
     a.ms = ms;
-    const float vx = a.acrossX ? autoScrollSpeed(app, (float)(a.pointer.x - a.origin.x)) : 0.0f;
-    const float vy = a.acrossY ? autoScrollSpeed(app, (float)(a.pointer.y - a.origin.y)) : 0.0f;
+    float maxX = 0, maxY = 0;
+    touchScrollRange(app, a.target, a.list, maxX, maxY);
+    const float ox = (float)(a.pointer.x - a.origin.x), oy = (float)(a.pointer.y - a.origin.y);
+    const float vx = a.acrossX ? autoScrollSpeed(app, ox, ox > 0 ? a.roomRight : a.roomLeft, maxX) : 0.0f;
+    const float vy = a.acrossY ? autoScrollSpeed(app, oy, oy > 0 ? a.roomDown : a.roomUp, maxY) : 0.0f;
     if (vx == 0 && vy == 0) return true;
     // Something else moved it meanwhile (a jump, a relayout): go on from there
     float nowX, nowY;
