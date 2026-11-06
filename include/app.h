@@ -1026,6 +1026,9 @@ struct App {
         POINT origin{}, pointer{};  // client pixels
         float x = 0, y = 0;         // where the scroll has got to
         float leftX = 0, leftY = 0; // where it last left the target, to notice another scroll
+        // Pixels from the mark to the edges of its screen: the pointer there
+        // goes fastest (autoScrollSpeed)
+        float roomLeft = 0, roomRight = 0, roomUp = 0, roomDown = 0;
         double ms = 0;              // the last step
         int tab = -1;
         std::string file;

@@ -80,10 +80,71 @@ void scenario(App& app, const char* path, int width, float scale) {
     }
     check(rising && even, "farther from the mark goes faster, the same up and down" + where);
     check(std::fabs(autoScrollSpeed(app, dpi(app, 100000)) - dpi(app, 8)) < 1e-3f,
-          "the speed has a cap" + where);
+          "with no length to cross, the curve stops at its top" + where);
+
+    // Something long goes on faster past the knee, out to the screen's edge,
+    // where it crosses the whole length in 0.35 s
+    {
+        const float room = dpi(app, 700), range = dpi(app, 100000), top = range / 350;
+        const float knee = dpi(app, 14 + 80);
+        check(autoScrollSpeed(app, knee, room, range) == autoScrollSpeed(app, knee),
+              "up to the knee a long page goes as a short one" + where);
+        const float edge = autoScrollSpeed(app, room, room, range);
+        check(std::fabs(edge - top) < top * 1e-3f, "at the screen's edge it crosses the page in 0.35 s" + where +
+                                                        ": " + std::to_string(edge) + " for " + std::to_string(top));
+        check(autoScrollSpeed(app, room * 2, room, range) == edge, "past the edge, on another screen, no faster" + where);
+        check(autoScrollSpeed(app, -room, room, range) == -edge, "and the same upward" + where);
+        // Past the knee the curve is boosted, by 1 at the knee and enough at
+        // the edge; halfway out, by 0.5 - 0.35 / 4 of the boost's doublings
+        auto curve = [&](float pastDip) { return 0.0032f * std::pow(pastDip, 1.3f) * scale; };
+        const float reachDip = 700 - 14, halfDip = (80 + reachDip) / 2;
+        const float half = autoScrollSpeed(app, (knee + room) / 2, room, range);
+        const float halfExpected = curve(halfDip) * std::pow(top / curve(reachDip), 0.5f - 0.35f / 4);
+        check(std::fabs(half - halfExpected) < half * 0.01f,
+              "halfway to the edge, the curve boosted by its share" + where + ": " + std::to_string(half) + " for " +
+                  std::to_string(halfExpected));
+        check(autoScrollSpeed(app, dpi(app, 14 + 100), room, range) > autoScrollSpeed(app, dpi(app, 14 + 100)) * 1.02f,
+              "just past the knee it is already faster than the curve alone" + where);
+        // As asked for: a 30 000 DIP document, the mark mid-screen at 1440 px
+        const float midRoom = dpi(app, 719);
+        const float midHalf = autoScrollSpeed(app, (knee + midRoom) / 2, midRoom, dpi(app, 30000)) / scale * 1000;
+        check(midHalf > 14500 && midHalf < 15500,
+              "a long document runs about 15 000 DIP/s halfway to the edge" + where + ": " + std::to_string(midHalf));
+        previous = 0;
+        rising = true;
+        for (float off = mark + 1; off < room * 1.5f; off += dpi(app, 5)) {
+            const float v = autoScrollSpeed(app, off, room, range);
+            if (v < previous || v < autoScrollSpeed(app, off)) rising = false;
+            previous = v;
+        }
+        check(rising, "it only rises, and never slower than the curve alone" + where);
+        // A tall screen and a page only somewhat long: the curve alone would
+        // pass the page's full speed before the edge, and it still only rises
+        previous = 0;
+        rising = true;
+        for (float off = mark + 1; off < dpi(app, 1400); off += dpi(app, 5)) {
+            const float v = autoScrollSpeed(app, off, dpi(app, 1270), dpi(app, 5000));
+            if (v < previous) rising = false;
+            previous = v;
+        }
+        check(rising, "on a tall screen too it only rises" + where);
+        check(autoScrollSpeed(app, room, room, dpi(app, 2500)) == autoScrollSpeed(app, room),
+              "a page the curve's top crosses quickly enough goes no faster" + where);
+        check(std::fabs(autoScrollSpeed(app, dpi(app, 14 + 80 + 200), 0, range) - top) < top * 1e-3f,
+              "with no screen edge known, full speed 200 DIP past the knee" + where);
+        check(std::fabs(autoScrollSpeed(app, dpi(app, 14 + 80 + 200), dpi(app, 150), range) - top) < top * 1e-3f,
+              "a mark near the screen's edge still reaches full speed" + where);
+    }
     const float at64 = autoScrollSpeed(app, dpi(app, 64)) / scale;
-    check(at64 > 0.4f && at64 < 0.6f, "50 DIP past the mark runs about 500 DIP a second" + where + ": " +
-                                          std::to_string(at64));
+    check(at64 > 0.55f && at64 < 0.65f, "50 DIP past the mark runs about 600 DIP a second" + where + ": " +
+                                            std::to_string(at64));
+    // Up to the knee in step with the distance: it gets going at once
+    const float at24 = autoScrollSpeed(app, dpi(app, 24)) / scale, at34 = autoScrollSpeed(app, dpi(app, 34)) / scale;
+    check(at24 > 0.11f && at24 < 0.13f, "10 DIP past the mark already runs about 120 DIP a second" + where + ": " +
+                                            std::to_string(at24));
+    check(std::fabs(at34 - 2 * at24) < 0.002f, "twice as far past the mark, twice as fast, up to the knee" + where);
+    const float belowKnee = autoScrollSpeed(app, dpi(app, 14 + 79.9f)), aboveKnee = autoScrollSpeed(app, dpi(app, 14 + 80.1f));
+    check(aboveKnee >= belowKnee && aboveKnee - belowKnee < dpi(app, 0.01f), "no jump at the knee" + where);
 
     // Where it starts: the page, not the tab strip, the scrollbar or an
     // overlay, and not during a selection drag
@@ -110,7 +171,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     autoScrollPointer(app, app.hwnd, shifted(middle, 0, below));
     const double start = ms;
     run(app, 1000);
-    const float expected = autoScrollSpeed(app, (float)below) * (float)(ms - start);
+    const float expected = autoScrollSpeed(app, (float)below, app.autoScroll.roomDown, maxY) * (float)(ms - start);
     check(std::fabs(app.scrollY - expected) < 1 && app.scrollX == 0,
           "below the mark the page runs down at that speed" + where + ": " + std::to_string(app.scrollY) +
               " for " + std::to_string(expected));
@@ -125,7 +186,7 @@ void scenario(App& app, const char* path, int width, float scale) {
     // A late timer does not leap
     autoScrollPointer(app, app.hwnd, shifted(middle, 0, below));
     autoScrollStep(app, app.hwnd, ms += 2000);
-    check(app.scrollY - still <= autoScrollSpeed(app, (float)below) * 50 + 0.5f, "a late step moves at most 50 ms on" + where);
+    check(app.scrollY - still <= autoScrollSpeed(app, (float)below, app.autoScroll.roomDown, maxY) * 50 + 0.5f, "a late step moves at most 50 ms on" + where);
     // A click ends it, and that click and its release do nothing else
     check(autoScrollTakesPress(app, app.hwnd, WM_LBUTTONUP) && !autoScrollActive(app), "a click stops autoscroll" + where);
     check(!autoScrollTakesRelease(app, WM_MBUTTONUP), "another button's release is not the click's" + where);
@@ -165,7 +226,7 @@ void scenario(App& app, const char* path, int width, float scale) {
         as.pacer->blankMs = as.ms + 16;
         const float before = app.scrollY;
         autoScrollFrame(app, app.hwnd);
-        const float framed = autoScrollSpeed(app, (float)below) * 16;
+        const float framed = autoScrollSpeed(app, (float)below, app.autoScroll.roomDown, maxY) * 16;
         check(autoScrollActive(app) && std::fabs(app.scrollY - before - framed) < 1,
               "a frame runs the page on by the refresh's time" + where + ": " +
                   std::to_string(app.scrollY - before) + " for " + std::to_string(framed));
@@ -185,6 +246,27 @@ void scenario(App& app, const char* path, int width, float scale) {
     autoScrollFrame(app, app.hwnd);
     check(app.scrollY == framedTo && !autoScrollActive(app), "a frame posted before it ended does nothing" + where);
     while (PeekMessageW(&frame, app.hwnd, WM_APP_AUTOSCROLL_FRAME, WM_APP_AUTOSCROLL_FRAME, PM_REMOVE)) {}
+
+    // Steps go by the room to the screen's edge and the page's length: the
+    // pointer at the edge runs the page at full speed
+    {
+        app.scrollY = app.targetScrollY = 0;
+        check(autoScrollBegin(app, app.hwnd, middle, ms += 500), "it starts at the top" + where);
+        auto& as = app.autoScroll;
+        check(as.roomUp > 0 && as.roomDown > 0, "it knows how far the screen's edges are" + where);
+        autoScrollMiddleUp(app, app.hwnd, as.pointer, ms += 50);
+        as.roomDown = dpi(app, 400);
+        autoScrollPointer(app, app.hwnd, shifted(middle, 0, (int)as.roomDown));
+        const double from = ms;
+        autoScrollStep(app, app.hwnd, ms += 16);
+        autoScrollStep(app, app.hwnd, ms += 16);
+        const float full = autoScrollSpeed(app, as.roomDown, as.roomDown, maxY);
+        const float gone = (float)(ms - from) * full;
+        check(full > autoScrollSpeed(app, as.roomDown) && std::fabs(app.scrollY - std::min(gone, maxY)) < 1,
+              "at the edge a step runs at the page's full speed" + where + ": " + std::to_string(app.scrollY) +
+                  " for " + std::to_string(gone));
+        autoScrollEnd(app, app.hwnd);
+    }
 
     // At the end it waits for the pointer to turn back
     app.scrollY = app.targetScrollY = maxY - dpi(app, 50);

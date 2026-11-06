@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Middle-click autoscroll gets going as soon as the pointer leaves the mark, and has no fixed top speed on long documents. Close to the mark it starts about twice as fast as before; farther out it keeps getting faster all the way to the edge of the screen, where it crosses the whole document in about a third of a second, so the pointer's distance picks any speed between a slow read and a dash to the end. It stopped getting faster about 400 pixels from the mark, so a long document took many seconds to cross
+
 ## [v4.0.4] - 2026-11-05
 
 ### Fixed

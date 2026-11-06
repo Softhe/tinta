@@ -54,8 +54,16 @@ void autoScrollFrame(App& app, HWND hwnd);
 // Ends it: a key, the wheel, lost focus or capture, another document
 void autoScrollEnd(App& app, HWND hwnd);
 // The speed for the pointer this many pixels from the mark along one way,
-// in pixels per ms, signed as the offset; 0 within the mark
-float autoScrollSpeed(const App& app, float offset);
+// in pixels per ms, signed as the offset; 0 within the mark. Up to 80 DIP
+// past the mark it rises in step with the distance, then follows a gentle
+// curve, which on its own stops at a screen in about a tenth of a second.
+// Past the knee, when the `range` pixels
+// to scroll are too long to cross quickly at that speed, the curve is
+// boosted more the farther out, to the screen's edge, `room` pixels from
+// the mark that way, where it crosses the whole range in 0.35 s. An edge
+// nearer than 200 DIP past the knee, or none known, counts as that far;
+// with no range, the curve alone
+float autoScrollSpeed(const App& app, float offset, float room = 0, float range = 0);
 // The mark's radius in pixels: within it nothing moves
 float autoScrollMarkRadius(const App& app);
 // The mark, drawn above the page while active
