@@ -237,12 +237,15 @@ bool autoScrollStep(App& app, HWND hwnd, double ms) {
     const double dt = std::min(ms - a.ms, kMaxStepMs);
     if (dt <= 0) return true;
     a.ms = ms;
+    const float ox = (float)(a.pointer.x - a.origin.x), oy = (float)(a.pointer.y - a.origin.y);
+    const bool goX = a.acrossX && autoScrollSpeed(app, ox) != 0, goY = a.acrossY && autoScrollSpeed(app, oy) != 0;
+    // On the mark nothing moves: the length to scroll is not read (for the
+    // search results, that builds every row) at each refresh while it rests
+    if (!goX && !goY) return true;
     float maxX = 0, maxY = 0;
     touchScrollRange(app, a.target, a.list, maxX, maxY);
-    const float ox = (float)(a.pointer.x - a.origin.x), oy = (float)(a.pointer.y - a.origin.y);
-    const float vx = a.acrossX ? autoScrollSpeed(app, ox, ox > 0 ? a.roomRight : a.roomLeft, maxX) : 0.0f;
-    const float vy = a.acrossY ? autoScrollSpeed(app, oy, oy > 0 ? a.roomDown : a.roomUp, maxY) : 0.0f;
-    if (vx == 0 && vy == 0) return true;
+    const float vx = goX ? autoScrollSpeed(app, ox, ox > 0 ? a.roomRight : a.roomLeft, maxX) : 0.0f;
+    const float vy = goY ? autoScrollSpeed(app, oy, oy > 0 ? a.roomDown : a.roomUp, maxY) : 0.0f;
     // Something else moved it meanwhile (a jump, a relayout): go on from there
     float nowX, nowY;
     touchScrollPosition(app, a.target, a.list, nowX, nowY);
