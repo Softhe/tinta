@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v4.1.2] - 2026-11-15
 
 ### Changed
 - The fork takes in the original project's 4.0.3, 4.1.0 and 4.1.1, listed below: links that open a program or another app ask first, folding sections, citations, CSS themes, Ctrl+Shift+T and many fixes. Middle-click autoscroll and the fork's other changes are kept. The fork's own 4.0.3 to 4.0.5, marked below, came before the original's 4.0.3 and do not hold its changes
