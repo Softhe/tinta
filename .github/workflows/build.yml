@@ -54,18 +54,22 @@ jobs:
             - Portable: download `tinta.exe` below and run it (SmartScreen may ask: "More info", then "Run anyway")
             - Optionally run `tinta.exe /register` to register Markdown, Mermaid and PlantUML files
 
-            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork, on top of 4.0.4. The Microsoft Store and winget versions are the original project's and do not include the fork's changes. For middle-click autoscroll, added in 4.0.3, see the [v4.0.3 notes](https://github.com/Softhe/tinta/releases/tag/v4.0.3).
+            A release of the [Softhe/tinta](https://github.com/Softhe/tinta) fork: the original project's 4.1.1 with the fork's middle-click autoscroll. The Microsoft Store and winget versions are the original project's and do not include the fork's changes. For autoscroll, see the fork's [v4.0.3](https://github.com/Softhe/tinta/releases/tag/v4.0.3), [v4.0.4](https://github.com/Softhe/tinta/releases/tag/v4.0.4) and [v4.0.5](https://github.com/Softhe/tinta/releases/tag/v4.0.5) notes.
 
             ### Changed
-            - Middle-click autoscroll gets going as soon as the pointer leaves the mark, and has no fixed top speed on long documents. Close to the mark it starts about twice as fast as before; farther out it keeps getting faster all the way to the edge of the screen, where it crosses the whole document in about a third of a second, so the pointer's distance picks any speed between a slow read and a dash to the end. It stopped getting faster about 400 pixels from the mark, so a long document took many seconds to cross
+            - Takes in the original project's [4.0.3](https://github.com/oipoistar/tinta/releases/tag/v4.0.3), [4.1.0](https://github.com/oipoistar/tinta/releases/tag/v4.1.0) and [4.1.1](https://github.com/oipoistar/tinta/releases/tag/v4.1.1), which the fork's earlier releases did not have: a link that opens a program, a script or another app asks first; sections fold; citations, papers and CSS themes; the ten built-in themes redesigned; Ctrl+Shift+T reopens closed tabs; Markdown files can open in Live or Source; and many fixes, among them crashes and lost text in Replace, review notes and the print preview. See those notes for the full lists
+            - Middle-click autoscroll is unchanged and works with all of it
+
+            ### Security
+            - A front matter's `bibliography:` or `csl:` on another computer's share is read only for a document from that same server, as images and links are; in the original's 4.1.0 and 4.1.1 any document could make Tinta read one, signing in to the share with your Windows credentials
 
             ### What's included
             - Export as HTML, DOCX, or PDF, plus optional Pandoc formats
             - 22 natively rendered Mermaid diagram families, and PlantUML diagrams through a local PlantUML
             - Tabbed interface with drag, session restore, and a tab context menu
-            - 10 tuned themes (5 light, 5 dark) plus custom themes
+            - 10 themes (5 light, 5 dark) plus themes of your own in CSS
             - Hardware-accelerated rendering via Direct2D
-            - Single portable executable about 4 MB, no dependencies
+            - Single portable executable of about 5 MB, no dependencies
           files: build/Release/tinta.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

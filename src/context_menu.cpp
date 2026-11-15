@@ -1,3 +1,4 @@
+#include "ui_scale.h"
 #include "overlays.h"
 
 #include <algorithm>
@@ -17,6 +18,7 @@ const std::vector<ContextMenuEntry>& contextMenuEntries(const App& app) {
         {CTX_AS_SHEET, "ctx.as_sheet", L"", false},
         {CTX_EDIT, "ctx.edit", L"", false},
         {CTX_SEARCH, "ctx.search", L"", false},
+        {CTX_FOLD_ALL, "ctx.fold_all", L"", false},
         {CTX_TOC, "ctx.toc", L"", true},
         {CTX_BROWSE, "ctx.browse", L"", false},
         {CTX_COPY_PATH, "tab.menu.copy_path", L"", false},
@@ -46,10 +48,10 @@ const std::vector<ContextMenuEntry>& contextMenuEntries(const App& app) {
                                : (app.editMode ? preview : document);
 }
 
-float contextMenuPadding(const App& app) { return dpi(app, 6.0f); }
-float contextMenuSeparatorHeight(const App& app) { return dpi(app, 9.0f); }
+float contextMenuPadding(const App& app) { return dpi(app, uiscale::menuPad); }
+float contextMenuSeparatorHeight(const App& app) { return dpi(app, uiscale::menuSeparator); }
 float contextMenuWidth(const App& app) {
-    return std::min(dpi(app, app.applicationMenu ? 260.0f : 210.0f), (float)app.width);
+    return std::min(dpi(app, app.applicationMenu ? 260.0f : 208.0f), (float)app.width);
 }
 
 // Keep every action reachable on short windows and at high display scaling.
@@ -59,7 +61,7 @@ float contextMenuItemHeight(const App& app) {
     for (const auto& entry : entries)
         if (entry.separatorAfter) gaps += contextMenuSeparatorHeight(app);
     float available = app.height - chromeTopHeight(app) - gaps;
-    return std::max(1.0f, std::min(dpi(app, 30.0f), available / (float)entries.size()));
+    return std::max(1.0f, std::min(dpi(app, uiscale::rowMenu), available / (float)entries.size()));
 }
 
 float contextMenuHeight(const App& app) {
@@ -95,6 +97,8 @@ bool contextMenuItemEnabled(const App& app, int item) {
         case CTX_SELECT_ALL: case CTX_SEARCH: case CTX_TOC:
             return document;
         case CTX_COPY_PATH: case CTX_REVEAL: return !app.currentFile.empty();
+        // A page read with headings that fold (#316)
+        case CTX_FOLD_ALL: return app.foldSections && !app.editMode && !app.foldArrows.empty();
         // A Markdown document, read here, can become a sheet of its sections
         case CTX_AS_SHEET: {
             if (app.editMode || app.currentFile.empty()) return false;

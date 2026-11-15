@@ -76,17 +76,33 @@ void checkTables(App& app) {
     if (app.tableRects.size() != 2) return;
     for (size_t ti = 0; ti < app.tableRects.size(); ++ti) {
         const auto& table = app.tableRects[ti];
+        // The columns' and rows' edges, from the cells themselves: a theme
+        // may draw the lines across only, as the built-in ones do
         std::vector<float> xs, ys;
-        for (const auto& line : app.layoutLines) {
-            if (closeEnough(line.p1.x, line.p2.x) && closeEnough(line.p1.y, table.bounds.top) && closeEnough(line.p2.y, table.bounds.bottom))
-                xs.push_back(line.p1.x);
-            if (closeEnough(line.p1.y, line.p2.y) && closeEnough(line.p1.x, table.bounds.left) && closeEnough(line.p2.x, table.bounds.right) &&
-                line.p1.y >= table.bounds.top - 0.1f && line.p1.y <= table.bounds.bottom + 0.1f)
-                ys.push_back(line.p1.y);
+        auto edge = [](std::vector<float>& edges, float at) {
+            for (float have : edges) {
+                if (closeEnough(have, at)) return;
+            }
+            edges.push_back(at);
+        };
+        for (const auto& cell : app.tableCellRects) {
+            if (cell.rect.top < table.bounds.top - 0.1f || cell.rect.bottom > table.bounds.bottom + 0.1f) continue;
+            edge(xs, cell.rect.left);
+            edge(xs, cell.rect.right);
+            edge(ys, cell.rect.top);
+            edge(ys, cell.rect.bottom);
         }
         std::sort(xs.begin(), xs.end());
         std::sort(ys.begin(), ys.end());
         check(xs.size() == (ti == 0 ? 14 : 4) && ys.size() == 4, "expected columns and rows remain");
+        // A line under every row, from side to side
+        size_t under = 0;
+        for (const auto& line : app.layoutLines) {
+            if (!closeEnough(line.p1.y, line.p2.y) || !closeEnough(line.p1.x, table.bounds.left) ||
+                !closeEnough(line.p2.x, table.bounds.right)) continue;
+            for (size_t r = 1; r < ys.size(); ++r) under += std::abs(line.p1.y - ys[r]) < 0.1f ? 1 : 0;
+        }
+        check(ys.size() < 2 || under == ys.size() - 1, "a line runs under every row");
         if (xs.size() < 2 || ys.size() < 2) continue;
         auto cellFor = [&](const D2D1_RECT_F& bounds, D2D1_RECT_F& cell) {
             if (bounds.top < table.bounds.top || bounds.top >= table.bounds.bottom) return false;
@@ -209,6 +225,67 @@ void checkCellWords(App& app) {
     }
 }
 
+// Words select where they are clicked, before and after tables (#318).
+// Measuring a styled or wrapping cell lays it out at y = 0 and takes it
+// back; its rectangles stayed in the buckets of the page's first lines, or
+// pushed the last real bucket off the end of the list, so a double-click
+// in the paragraph above a table took a word from another line.
+void checkWordsAroundTables(App& app) {
+    const auto fixture = std::filesystem::path(TINTA_FRAGMENT_FIXTURE).parent_path().parent_path() /
+                         "table-selection-318.md";
+    std::ifstream file(fixture);
+    check(file.good(), "selection fixture opens");
+    std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    auto doc = app.parser.parse(source);
+    check(doc.success, "selection fixture parses");
+    app.root = doc.root;
+    app.fitBlocks.clear();
+    for (int theme : {0, 5}) {
+        applyTheme(app, theme);
+        for (int width : {1050, 650, 420}) {
+            app.width = width;
+            scenario = "selection-theme" + std::to_string(theme) + "-width" + std::to_string(width);
+            layoutDocument(app);
+            check(app.tableRects.size() == 4, "the four tables render");
+            // Each rectangle is in exactly one bucket, the one of its line,
+            // and the buckets run down the page
+            std::vector<int> seen(app.textRects.size(), 0);
+            bool ordered = true, named = true, onLine = true;
+            for (size_t b = 0; b < app.lineBuckets.size(); ++b) {
+                const auto& bucket = app.lineBuckets[b];
+                if (b && bucket.top < app.lineBuckets[b - 1].top) ordered = false;
+                for (size_t idx : bucket.textRectIndices) {
+                    if (idx >= app.textRects.size()) {
+                        named = false;
+                        continue;
+                    }
+                    ++seen[idx];
+                    if (std::abs(app.textRects[idx].rect.top - bucket.top) > 5.0f) onLine = false;
+                }
+            }
+            check(ordered, "line buckets run down the page");
+            check(named, "line buckets name only rectangles that were laid out");
+            check(onLine, "a line bucket holds only the rectangles of its line");
+            check(std::all_of(seen.begin(), seen.end(), [](int n) { return n == 1; }),
+                  "every rectangle sits in exactly one line bucket");
+            // The double-click path for every word on the page: hit-test the
+            // middle of its rectangle, then take the word there. A triple
+            // click takes the clicked line, so the word's line holds it.
+            for (const auto& r : app.textRects) {
+                if (!r.docLength) continue;
+                const size_t off = selectionOffsetAtPoint(app, (r.rect.left + r.rect.right) / 2,
+                                                          (r.rect.top + r.rect.bottom) / 2);
+                check(off >= r.docStart && off <= r.docStart + r.docLength,
+                      "a click lands in the text under the pointer");
+                size_t start = 0, end = 0;
+                check(selectionLineRange(app, off, start, end) && start <= r.docStart &&
+                          r.docStart + r.docLength <= end,
+                      "a triple-click takes the line under the pointer");
+            }
+        }
+    }
+}
+
 int runTableLayoutTests() {
     {
         auto state = std::make_unique<App>();
@@ -237,7 +314,10 @@ int runTableLayoutTests() {
                         app.fitBlocks = fit ? std::vector<unsigned>{0x40000000u, 0x40000001u} : std::vector<unsigned>{};
                         scenario = "theme" + std::to_string(theme) + "-scale" + std::to_string(static_cast<int>(scale * 100)) +
                                    "-width" + std::to_string(width) + (fit ? "-fit" : "-auto");
+                        // The cells' places are kept in edit mode (in-place table editing)
+                        app.editMode = true;
                         layoutDocument(app);
+                        app.editMode = false;
                         checkTables(app);
                         if (originalTsv.empty()) for (const auto& table : app.tableRects) originalTsv.push_back(table.tsv);
                         for (size_t i = 0; i < app.tableRects.size() && i < originalTsv.size(); ++i)
@@ -253,6 +333,7 @@ int runTableLayoutTests() {
         app.contentScale = 1.0f;
         updateTextFormats(app);
         checkCellWords(app);
+        checkWordsAroundTables(app);
     }
     CoUninitialize();
     std::cout << "Wide table layout: " << failures << " failures\n";

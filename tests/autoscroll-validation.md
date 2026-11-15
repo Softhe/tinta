@@ -283,11 +283,44 @@ capture after that second shows the document's last line (`License`,
 `MIT`) with the scrollbar at the bottom; at the old 8 DIP/ms it would have
 gone about 8000 px.
 
+### After taking in upstream 4.1.1
+
+The fork took in the original project's 4.0.3, 4.1.0 and 4.1.1. Upstream's
+Zotero answer took `WM_APP + 8`, so the pacer's frame moved to
+`WM_APP + 9`; `TIMER_AUTOSCROLL` (17) is still free upstream. Upstream's
+new `clipboard_keys` test copies and pastes, so it joined the clipboard
+lock: without it, it failed once under `ctest -j 6`. 86 of 86 tests then
+passed in three runs in a row, with no build warnings.
+
+A real-window driver ran the merged build and the released 4.0.5 exe side
+by side at 96 DPI, in the new built-in design. It sends keys as posted
+`WM_KEYDOWN`/`WM_KEYUP` messages to the window, which reach it even where
+`SendInput` key-downs do not (Alt+Tab still goes through `SendInput`).
+Both passed all 21 checks:
+
+- idle page still; a click runs below the mark, steers with the pointer
+  outside the window and waits on the mark; Esc stops it
+- Alt+Tab stops it, and it stays stopped on return; losing focus while
+  held stops it, and a new middle click afterwards starts again
+- the wheel, a release after a drag, a left click and a right click stop
+  it; the right click opens no menu (checked on the screenshot)
+- held far below the mark, it reaches the end of the document and stops
+- in the editor's source pane (split with the preview), it runs below
+  the mark with the preview following, and Esc stops it without leaving
+  the editor
+- after it stops, Page Up, Page Down and Home scroll as usual
+
+With `SendInput` keys, the first key after launch and keys after
+autoscroll were lost for both builds alike; posted keys showed that this
+came from the test, not from Tinta. A plain Esc in the reading view with
+nothing open closes the window, so the driver no longer presses one.
+
 ### Remaining
 
 - Home, End and PageDown during autoscroll were not driven in the real
-  window: on this machine another program takes their key-downs. The
-  harness covers Home.
+  window with `SendInput`: on this machine another program takes their
+  key-downs. Posted keys reach the window (above); the harness covers
+  Home.
 - Hi-DPI: before 4.0.3 the second monitor was set to 150% and the driver
   passed 24 of 24 there at 144 DPI, the mark about 42 px across; the
   monitor was set back to 100%. The paced frames were not run at 150%.
