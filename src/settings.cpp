@@ -6,6 +6,7 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <appmodel.h>
+#include <cctype>
 #include <fstream>
 #include <string>
 
@@ -26,6 +27,20 @@ std::wstring getSettingsPath() {
     return dir + L"\\settings.ini";
 }
 
+// settings.ini has the view by its name, for a hand that edits it; a
+// name it does not know is the reading view
+const char* openModeName(int mode) {
+    return mode == OPEN_LIVE ? "live" : mode == OPEN_SOURCE ? "source" : "reading";
+}
+
+int openModeByName(const std::string& name) {
+    std::string lower;
+    for (char c : name) {
+        if (c != ' ' && c != '\t' && c != '\r') lower += (char)tolower((unsigned char)c);
+    }
+    return lower == "live" ? OPEN_LIVE : lower == "source" ? OPEN_SOURCE : OPEN_READING;
+}
+
 void saveSettings(const Settings& settings) {
     std::wstring path = getSettingsPath();
     if (path.empty()) return;
@@ -35,6 +50,7 @@ void saveSettings(const Settings& settings) {
 
     file << "[Settings]\n";
     file << "themeIndex=" << settings.themeIndex << "\n";
+    if (!settings.themeName.empty()) file << "themeName=" << settings.themeName << "\n";
     file << "zoomFactor=" << settings.zoomFactor << "\n";
     file << "windowX=" << settings.windowX << "\n";
     file << "windowY=" << settings.windowY << "\n";
@@ -67,15 +83,21 @@ void saveSettings(const Settings& settings) {
     file << "followSystemTheme=" << (settings.followSystemTheme ? 1 : 0) << "\n";
     file << "lightThemeIndex=" << settings.lightThemeIndex << "\n";
     file << "darkThemeIndex=" << settings.darkThemeIndex << "\n";
+    if (!settings.lightThemeName.empty()) file << "lightThemeName=" << settings.lightThemeName << "\n";
+    if (!settings.darkThemeName.empty()) file << "darkThemeName=" << settings.darkThemeName << "\n";
     file << "folderSearchEnabled=" << (settings.folderSearchEnabled ? 1 : 0) << "\n";
     file << "tabSearchEnabled=" << (settings.tabSearchEnabled ? 1 : 0) << "\n";
     file << "browserFocusPath=" << (settings.browserFocusPath ? 1 : 0) << "\n";
     file << "openInTabs=" << (settings.openInTabs ? 1 : 0) << "\n";
+    file << "reopenTabs=" << (settings.reopenTabs ? 1 : 0) << "\n";
     file << "keepDeletedTabs=" << (settings.keepDeletedTabs ? 1 : 0) << "\n";
     file << "showNotifications=" << (settings.showNotifications ? 1 : 0) << "\n";
     file << "readingWidthPct=" << settings.readingWidthPct << "\n";
     file << "zenWidthPct=" << settings.zenWidthPct << "\n";
     file << "headingRules=" << (settings.headingRules ? 1 : 0) << "\n";
+    file << "foldSections=" << (settings.foldSections ? 1 : 0) << "\n";
+    file << "foldOnOpen=" << (settings.foldOnOpen ? 1 : 0) << "\n";
+    file << "openMode=" << openModeName(settings.openMode) << "\n";
     file << "tocOnLeft=" << (settings.tocOnLeft ? 1 : 0) << "\n";
     file << "tocPinned=" << (settings.tocPinned ? 1 : 0) << "\n";
     file << "browserPinned=" << (settings.browserPinned ? 1 : 0) << "\n";
@@ -188,6 +210,14 @@ void persistWordCount(const App& app) {
     saveSettings(settings);
 }
 
+// The view Markdown files open in (#322) is kept when picked, as
+// openInTabs is: the next window started reads it from the file
+void persistOpenMode(const App& app) {
+    Settings settings = loadSettings();
+    settings.openMode = app.openMode;
+    saveSettings(settings);
+}
+
 void persistCloseKeepsDrafts(const App& app) {
     Settings settings = loadSettings();
     settings.closeKeepsDrafts = app.closeKeepsDrafts;
@@ -220,23 +250,19 @@ void persistOpenInTabs(const App& app) {
     saveSettings(settings);
 }
 
+// "Reopen tabs from last time" (#323) is kept when toggled, as openInTabs
+// is: the window that closes and the next one started both read the file
+void persistReopenTabs(const App& app) {
+    Settings settings = loadSettings();
+    settings.reopenTabs = app.reopenTabs;
+    saveSettings(settings);
+}
+
 // The title bar's pin is kept when pressed, as openInTabs is, so the next
 // window opens on top or not as this one was left (#312)
 void persistAlwaysOnTop(const App& app) {
     Settings settings = loadSettings();
     settings.alwaysOnTop = app.alwaysOnTop;
-    saveSettings(settings);
-}
-
-// A theme change persists immediately: windows spawned afterwards
-// (quick notes, drag-outs) read settings.ini at startup and would
-// otherwise come up in the look from the previous session
-void persistThemeChoice(const App& app) {
-    Settings settings = loadSettings();
-    settings.themeIndex = app.currentThemeIndex;
-    settings.followSystemTheme = app.followSystemTheme;
-    settings.lightThemeIndex = app.lightThemeIndex;
-    settings.darkThemeIndex = app.darkThemeIndex;
     saveSettings(settings);
 }
 
@@ -315,6 +341,12 @@ Settings loadSettings() {
         } else if (key == "themeIndex") {
             int idx = std::stoi(value);
             if (idx >= 0) settings.themeIndex = idx;  // clamped at apply via themeCount()
+        } else if (key == "themeName") {
+            settings.themeName = value;
+        } else if (key == "lightThemeName") {
+            settings.lightThemeName = value;
+        } else if (key == "darkThemeName") {
+            settings.darkThemeName = value;
         } else if (key == "zoomFactor") {
             float z = std::stof(value);
             if (z >= 0.5f && z <= 3.0f) settings.zoomFactor = z;
@@ -336,6 +368,12 @@ Settings loadSettings() {
             if (w >= 30 && w <= 100) settings.zenWidthPct = w;
         } else if (key == "headingRules") {
             settings.headingRules = (value == "1");
+        } else if (key == "foldSections") {
+            settings.foldSections = (value == "1");
+        } else if (key == "foldOnOpen") {
+            settings.foldOnOpen = (value == "1");
+        } else if (key == "openMode") {
+            settings.openMode = openModeByName(value);
         } else if (key == "tocOnLeft") {
             settings.tocOnLeft = (value == "1");
         } else if (key == "tocPinned") {
@@ -372,6 +410,10 @@ Settings loadSettings() {
             settings.browserFocusPath = (value == "1");
         } else if (key == "openInTabs") {
             settings.openInTabs = (value == "1");
+        } else if (key == "reopenTabs") {
+            // Only a plain 0 turns it off: a file from before the setting,
+            // or a value that is neither, keeps the tabs coming back
+            settings.reopenTabs = (value != "0");
         } else if (key == "keepDeletedTabs") {
             settings.keepDeletedTabs = (value == "1");
         } else if (key == "showNotifications") {
