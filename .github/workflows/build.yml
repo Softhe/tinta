@@ -60,6 +60,9 @@ jobs:
             - Takes in the original project's [4.0.3](https://github.com/oipoistar/tinta/releases/tag/v4.0.3), [4.1.0](https://github.com/oipoistar/tinta/releases/tag/v4.1.0) and [4.1.1](https://github.com/oipoistar/tinta/releases/tag/v4.1.1), which the fork's earlier releases did not have: a link that opens a program, a script or another app asks first; sections fold; citations, papers and CSS themes; the ten built-in themes redesigned; Ctrl+Shift+T reopens closed tabs; Markdown files can open in Live or Source; and many fixes, among them crashes and lost text in Replace, review notes and the print preview. See those notes for the full lists
             - Middle-click autoscroll is unchanged and works with all of it
 
+            ### Security
+            - A front matter's `bibliography:` or `csl:` on another computer's share is read only for a document from that same server, as images and links are; in the original's 4.1.0 and 4.1.1 any document could make Tinta read one, signing in to the share with your Windows credentials
+
             ### What's included
             - Export as HTML, DOCX, or PDF, plus optional Pandoc formats
             - 22 natively rendered Mermaid diagram families, and PlantUML diagrams through a local PlantUML

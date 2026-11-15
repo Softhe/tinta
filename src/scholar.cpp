@@ -10,6 +10,7 @@
 #include "cite.h"
 #include "csl.h"
 #include "csl_bundle.h"
+#include "network_path.h"
 
 #include <windows.h>
 
@@ -648,7 +649,13 @@ std::shared_ptr<const csl::Style> loadStyle(const std::string& wanted, const std
         key = L"style|" + wide(bundled);
     } else {
         std::wstring path = resolve(wanted, folder);
-        if (!readFile(path, xml, time)) {
+        // A share on another server than the document's is not read: that
+        // would sign in to it with the user's Windows credentials
+        if (!qmd::mayOpenFromDocument(path, folder)) {
+            problems.push_back(wanted + ": network path not opened; citations use Chicago author-date");
+            bundled = "chicago-author-date";
+            key = L"style|" + wide(bundled);
+        } else if (!readFile(path, xml, time)) {
             problems.push_back(wanted + ": no such style; citations use Chicago author-date");
             bundled = "chicago-author-date";
             key = L"style|" + wide(bundled);
@@ -736,6 +743,10 @@ Session begin(const std::vector<fm::Property>& front, const std::wstring& folder
             continue;
         }
         const std::wstring path = resolve(name, folder);
+        if (!qmd::mayOpenFromDocument(path, folder)) {
+            session.problems.push_back(name + ": network path not opened");
+            continue;
+        }
         session.files.push_back(path);
         if (auto library = loadLibrary(path, session.problems)) {
             for (const auto& item : library->items) merged->add(item);
@@ -766,6 +777,10 @@ std::vector<std::wstring> followedFiles(const ElementPtr& root, const std::wstri
     if (!style.empty() && (bundledStyleName(style).empty() || style.find_first_of("/\\") != std::string::npos)) {
         files.push_back(resolve(style, folder));
     }
+    // Nor is a share on another server watched
+    files.erase(std::remove_if(files.begin(), files.end(),
+                               [&](const std::wstring& f) { return !qmd::mayOpenFromDocument(f, folder); }),
+                files.end());
     return files;
 }
 

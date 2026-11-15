@@ -5,6 +5,9 @@
 ### Changed
 - The fork takes in the original project's 4.0.3, 4.1.0 and 4.1.1, listed below: links that open a program or another app ask first, folding sections, citations, CSS themes, Ctrl+Shift+T and many fixes. Middle-click autoscroll and the fork's other changes are kept. The fork's own 4.0.3 to 4.0.5, marked below, came before the original's 4.0.3 and do not hold its changes
 
+### Security
+- A `bibliography:` or `csl:` in the front matter on another computer's share (`\\server\share\...`) is read and watched only for a document from that same server, as images and links are since 3.9.6; reading it signs in to the share with your Windows credentials. Anywhere else the citation problems say "network path not opened", and citations use the bundled style. In 4.1.0 and 4.1.1 any document could name such a file and it was read when the document opened
+
 ## [v4.1.1] - 2026-11-14
 
 ### Added

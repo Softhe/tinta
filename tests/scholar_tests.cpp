@@ -376,6 +376,29 @@ void inlineReferences(const fs::path& fixtures) {
     check(contains(list, "A title the front matter gives") && contains(list, "Brooks"),
           "the front matter's entry wins, and the library's others stay:\n" + list);
 }
+// A bibliography or style on another server's share is not read or watched:
+// opening it would sign in there with the user's Windows credentials, so a
+// document must not pick the server (as for images and links since 3.9.6).
+// The host is .invalid, so a failing check costs a lookup, never a sign-in
+void networkPaths() {
+    const std::string text =
+        "---\n"
+        "bibliography: \\\\tinta-test.invalid\\share\\refs.bib\n"
+        "csl: \\\\tinta-test.invalid\\share\\style.csl\n"
+        "---\n\nAs @doe2024 says.\n";
+    const auto session = scholar::begin(fm::parse(text).properties, L"C:\\notes", text);
+    std::string problems;
+    for (const auto& p : session.problems) problems += p + "\n";
+    check(session.files.empty(), "a share on another server is not followed");
+    check(std::count_if(session.problems.begin(), session.problems.end(),
+                        [](const std::string& p) { return contains(p, "network path not opened"); }) == 2,
+          "the bibliography and the style each say they were not opened:\n" + problems);
+    const auto parsed = parseText(text);
+    check(scholar::followedFiles(parsed.root, L"C:\\notes").empty(), "nor is it watched");
+    // A share on the document's own server is still read
+    const auto same = scholar::followedFiles(parsed.root, L"\\\\tinta-test.invalid\\share\\notes");
+    check(same.size() == 2, "a share on the document's own server is followed");
+}
 }  // namespace
 
 int main() {
@@ -388,6 +411,7 @@ int main() {
     sections(fixtures);
     notes(fixtures);
     inlineReferences(fixtures);
+    networkPaths();
     std::cout << "Scholar: " << failures << " failures\n";
     return failures ? 1 : 0;
 }
